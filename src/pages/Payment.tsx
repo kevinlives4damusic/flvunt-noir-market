@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -43,6 +42,13 @@ const Payment = () => {
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [processing, setProcessing] = useState(false);
+  
+  // New state for card inputs with validation
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [nameOnCard, setNameOnCard] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 4.99;
@@ -57,9 +63,123 @@ const Payment = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Card number formatter and validator
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Remove all non-digit characters
+    let value = input.replace(/\D/g, '');
+    
+    // Limit to 16 digits (common credit card length)
+    if (value.length > 16) {
+      value = value.slice(0, 16);
+    }
+    
+    // Format with spaces after every 4 digits
+    let formattedValue = '';
+    for (let i = 0; i < value.length; i++) {
+      if (i > 0 && i % 4 === 0) {
+        formattedValue += ' ';
+      }
+      formattedValue += value[i];
+    }
+    
+    setCardNumber(formattedValue);
+    
+    // Clear error if field is valid
+    if (value.length >= 13 && value.length <= 16) {
+      setFormErrors(prev => ({ ...prev, cardNumber: '' }));
+    }
+  };
+
+  // Expiry date formatter and validator
+  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Remove all non-digit characters
+    let value = input.replace(/\D/g, '');
+    
+    // Limit to 4 digits (MMYY)
+    if (value.length > 4) {
+      value = value.slice(0, 4);
+    }
+    
+    // Format as MM/YY
+    if (value.length > 2) {
+      value = value.slice(0, 2) + '/' + value.slice(2);
+    }
+    
+    setExpiryDate(value);
+    
+    // Clear error if field is valid
+    if (value.length === 4) {
+      setFormErrors(prev => ({ ...prev, expiryDate: '' }));
+    }
+  };
+
+  // CVV validator
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    // Remove all non-digit characters
+    let value = input.replace(/\D/g, '');
+    
+    // Limit to 3 or 4 digits
+    if (value.length > 4) {
+      value = value.slice(0, 4);
+    }
+    
+    setCvv(value);
+    
+    // Clear error if field is valid
+    if (value.length >= 3 && value.length <= 4) {
+      setFormErrors(prev => ({ ...prev, cvv: '' }));
+    }
+  };
+
+  // Validate all fields before submitting
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    // Card number validation
+    const cardDigits = cardNumber.replace(/\D/g, '');
+    if (!cardDigits || cardDigits.length < 13 || cardDigits.length > 16) {
+      errors.cardNumber = 'Please enter a valid card number';
+    }
+    
+    // Expiry date validation
+    const expiryDigits = expiryDate.replace(/\D/g, '');
+    if (expiryDigits.length !== 4) {
+      errors.expiryDate = 'Please enter a valid expiry date (MM/YY)';
+    } else {
+      const month = parseInt(expiryDigits.substring(0, 2));
+      if (month < 1 || month > 12) {
+        errors.expiryDate = 'Please enter a valid month (01-12)';
+      }
+    }
+    
+    // CVV validation
+    if (!cvv || cvv.length < 3) {
+      errors.cvv = 'Please enter a valid CVV';
+    }
+    
+    // Name validation
+    if (!nameOnCard.trim()) {
+      errors.nameOnCard = 'Please enter the name on your card';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handlePayment = () => {
     if (!isAuthenticated) {
       navigate('/login');
+      return;
+    }
+    
+    // Validate form fields first
+    if (!validateForm()) {
+      toast('Please check your payment information', {
+        description: 'Some fields contain errors or are incomplete'
+      });
       return;
     }
     
@@ -113,7 +233,7 @@ const Payment = () => {
                 <PaymentMethod 
                   id="paypal" 
                   name="PayPal" 
-                  icon={<img src="/yoco-logo.png" alt="PayPal" className="h-5" />} 
+                  icon={<img src="/paypal-logo.png" alt="PayPal" className="h-5" />} 
                   selected={paymentMethod === 'paypal'} 
                   onSelect={() => setPaymentMethod('paypal')} 
                 />
@@ -126,8 +246,14 @@ const Payment = () => {
                     <input 
                       type="text" 
                       placeholder="1234 5678 9012 3456" 
-                      className="w-full p-2 border border-gray-300 rounded"
+                      className={`w-full p-2 border ${formErrors.cardNumber ? 'border-red-500' : 'border-gray-300'} rounded`}
+                      value={cardNumber}
+                      onChange={handleCardNumberChange}
+                      maxLength={19} // 16 digits + 3 spaces
                     />
+                    {formErrors.cardNumber && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.cardNumber}</p>
+                    )}
                   </div>
                   <div className="flex gap-4">
                     <div className="flex-1">
@@ -135,16 +261,28 @@ const Payment = () => {
                       <input 
                         type="text" 
                         placeholder="MM/YY" 
-                        className="w-full p-2 border border-gray-300 rounded"
+                        className={`w-full p-2 border ${formErrors.expiryDate ? 'border-red-500' : 'border-gray-300'} rounded`}
+                        value={expiryDate}
+                        onChange={handleExpiryDateChange}
+                        maxLength={5} // MM/YY format (5 chars)
                       />
+                      {formErrors.expiryDate && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.expiryDate}</p>
+                      )}
                     </div>
                     <div className="w-24">
                       <label className="block text-sm mb-1">CVV</label>
                       <input 
                         type="text" 
                         placeholder="123" 
-                        className="w-full p-2 border border-gray-300 rounded"
+                        className={`w-full p-2 border ${formErrors.cvv ? 'border-red-500' : 'border-gray-300'} rounded`}
+                        value={cvv}
+                        onChange={handleCvvChange}
+                        maxLength={4}
                       />
+                      {formErrors.cvv && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.cvv}</p>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -152,8 +290,19 @@ const Payment = () => {
                     <input 
                       type="text" 
                       placeholder="John Doe" 
-                      className="w-full p-2 border border-gray-300 rounded"
+                      className={`w-full p-2 border ${formErrors.nameOnCard ? 'border-red-500' : 'border-gray-300'} rounded`}
+                      value={nameOnCard}
+                      onChange={(e) => {
+                        setNameOnCard(e.target.value);
+                        if (e.target.value.trim()) {
+                          setFormErrors(prev => ({ ...prev, nameOnCard: '' }));
+                        }
+                      }}
+                      maxLength={50}
                     />
+                    {formErrors.nameOnCard && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.nameOnCard}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -175,9 +324,26 @@ const Payment = () => {
                 </Button>
               </div>
               
-              <div className="flex items-center justify-center gap-2 mt-6 text-sm text-gray-500">
-                <Shield className="h-4 w-4" />
-                <span>Payment secured by 256-bit encryption</span>
+              <div className="flex flex-col items-center mt-6">
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Payment secured by 256-bit encryption</span>
+                </div>
+                
+                {/* Yoco powered badge */}
+                <div className="mt-2 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Secured by</p>
+                  <img 
+                    src="https://cdn.yoco.com/images/assets/logos/yoco-logo.svg" 
+                    alt="Powered by Yoco" 
+                    className="h-6 mx-auto" 
+                    onError={(e) => {
+                      // Fallback text if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.outerHTML = '<span className="text-sm font-medium">YOCO</span>';
+                    }}
+                  />
+                </div>
               </div>
             </div>
             
@@ -188,7 +354,10 @@ const Payment = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="p-4 border-t mt-4 text-sm text-gray-600">
                   <p className="mb-2">
-                    All transactions are secure and encrypted. We never store your credit card information.
+                    All transactions are secure and encrypted. Card details are processed by Yoco, a trusted payment provider.
+                  </p>
+                  <p className="mb-2">
+                    We accept Visa, Mastercard, American Express, and Diners Club cards.
                   </p>
                   <p>
                     For more information, please read our <a href="#" className="underline">Privacy Policy</a> and <a href="#" className="underline">Terms of Service</a>.
