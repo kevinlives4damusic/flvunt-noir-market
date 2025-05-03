@@ -5,6 +5,7 @@ import HeroSection from '@/components/HeroSection';
 import FeaturedProducts from '@/components/FeaturedProducts';
 import Newsletter from '@/components/Newsletter';
 import Footer from '@/components/Footer';
+import BackToTop from '@/components/BackToTop';
 
 const Index = () => {
   return (
@@ -24,6 +25,7 @@ const Index = () => {
         <Newsletter />
       </main>
       <Footer />
+      <BackToTop />
     </div>
   );
 };
