@@ -10,8 +10,10 @@ interface ToastWithProgressProps {
 }
 
 export const toastWithProgress = ({ message, description, duration = 4000 }: ToastWithProgressProps) => {
-  const toastId = toast(
-    ({ id }) => {
+  const toastId = toast(message, {
+    description,
+    duration,
+    render: ({ id }) => {
       const [progress, setProgress] = useState(0);
       
       useEffect(() => {
@@ -39,9 +41,8 @@ export const toastWithProgress = ({ message, description, duration = 4000 }: Toa
           <Progress value={progress} className="h-1" />
         </div>
       );
-    },
-    { duration }
-  );
+    }
+  });
   
   return toastId;
 };
