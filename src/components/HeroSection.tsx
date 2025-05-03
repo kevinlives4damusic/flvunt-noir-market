@@ -9,9 +9,8 @@ const HeroSection: React.FC = () => {
         loop
         muted
         playsInline
-        src="/images/FLVUNTT.mp4"
+        src="/images/hero/FLVUNTT.mp4"
       />
-      <div className="absolute inset-0 bg-black/20" /> {/* Optional overlay for better text visibility */}
     </div>
   );
 };

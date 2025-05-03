@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -12,6 +11,7 @@ import { CartContext } from '@/context/CartContext';
 import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ShoppingBag, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ProductQuickViewProps {
   product: {
@@ -23,11 +23,18 @@ interface ProductQuickViewProps {
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSizeSelect?: (size: string) => void;
 }
 
-const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, open, onOpenChange }) => {
+const ProductQuickView: React.FC<ProductQuickViewProps> = ({ 
+  product, 
+  open, 
+  onOpenChange,
+  onSizeSelect
+}) => {
   const { addToCart, isAuthenticated } = useContext(CartContext);
   const navigate = useNavigate();
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
   if (!product) return null;
 
@@ -36,15 +43,38 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, open, onOp
       navigate('/login');
       return;
     }
+
+    if (!selectedSize) {
+      toast.error("Please select a size first");
+      return;
+    }
     
     addToCart({
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.image_url
+      image: product.image_url,
+      size: selectedSize
     });
     
     onOpenChange(false);
+    toast.success("Added to cart");
+    setSelectedSize(null);
+  };
+
+  const handleWishlist = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    toast.success("Added to wishlist");
+  };
+
+  const handleSizeSelect = (size: string) => {
+    setSelectedSize(size);
+    if (onSizeSelect) {
+      onSizeSelect(size);
+    }
   };
 
   return (
@@ -81,7 +111,12 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, open, onOp
                   {['S', 'M', 'L', 'XL'].map((size) => (
                     <button 
                       key={size}
-                      className="w-10 h-10 border border-gray-300 flex items-center justify-center hover:border-black transition-colors"
+                      className={`w-10 h-10 border flex items-center justify-center transition-colors ${
+                        selectedSize === size 
+                          ? 'border-black bg-black text-white' 
+                          : 'border-gray-300 hover:border-black'
+                      }`}
+                      onClick={() => handleSizeSelect(size)}
                     >
                       {size}
                     </button>
@@ -98,7 +133,11 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, open, onOp
                 <ShoppingBag className="mr-2 h-4 w-4" />
                 Add to Bag
               </Button>
-              <Button variant="outline" className="flvunt-button-outline w-full">
+              <Button 
+                variant="outline" 
+                className="flvunt-button-outline w-full"
+                onClick={handleWishlist}
+              >
                 <Heart className="mr-2 h-4 w-4" />
                 Wishlist
               </Button>

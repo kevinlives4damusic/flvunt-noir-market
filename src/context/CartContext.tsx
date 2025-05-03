@@ -1,42 +1,73 @@
-
 import React, { createContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
-  id: number | string;
+  id: string | number;
   name: string;
   price: number;
   quantity: number;
   image: string;
+  size: string;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Omit<CartItem, 'quantity'>) => void;
+  addToCart: (item: Omit<CartItem, 'quantity'>) => void;
+  removeFromCart: (id: string | number, size: string) => void;
+  updateQuantity: (id: string | number, size: string, newQuantity: number) => void;
   isAuthenticated: boolean;
+  userEmail: string | null;
+  logout: () => Promise<void>;
 }
 
-export const CartContext = createContext<CartContextType>({
+const CartContext = createContext<CartContextType>({
   items: [],
   addToCart: () => {},
-  isAuthenticated: false
+  removeFromCart: () => {},
+  updateQuantity: () => {},
+  isAuthenticated: false,
+  userEmail: null,
+  logout: async () => {}
 });
 
-export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const navigate = useNavigate();
 
-  // Check authentication status on mount and listen for changes
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAuthenticated(!!session);
-    });
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsAuthenticated(!!session);
+        setUserEmail(session?.user?.email ?? null);
 
-    // Listen for auth changes
+        const savedCart = localStorage.getItem('cart');
+        if (savedCart) {
+          setItems(JSON.parse(savedCart));
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session);
+      setUserEmail(session?.user?.email ?? null);
+      
+      if (session) {
+        localStorage.setItem('supabase_session', JSON.stringify(session));
+      } else {
+        localStorage.removeItem('supabase_session');
+      }
     });
 
     return () => {
@@ -44,39 +75,78 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const addToCart = (product: Omit<CartItem, 'quantity'>) => {
-    if (!isAuthenticated) {
-      toast('Please log in to add items to your cart', {
-        description: 'You need to be logged in to shop',
-        action: {
-          label: 'Login',
-          onClick: () => window.location.href = '/login'
-        }
-      });
-      return;
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('cart', JSON.stringify(items));
     }
+  }, [items, isInitialized]);
 
+  const addToCart = (item: Omit<CartItem, 'quantity'>) => {
     setItems((prevItems) => {
-      const existingItem = prevItems.find((item) => item.id === product.id);
+      const existingItem = prevItems.find(
+        (i) => i.id === item.id && i.size === item.size
+      );
+      
       if (existingItem) {
-        return prevItems.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        return prevItems.map((i) =>
+          i.id === item.id && i.size === item.size
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
         );
-      } else {
-        return [...prevItems, { ...product, quantity: 1 }];
       }
-    });
-
-    toast('Item added to your cart', {
-      description: `${product.name} has been added to your cart`
+      
+      return [...prevItems, { ...item, quantity: 1 }];
     });
   };
 
+  const updateQuantity = (id: string | number, size: string, newQuantity: number) => {
+    if (newQuantity < 1) return;
+    
+    setItems((prevItems) => 
+      prevItems.map((item) =>
+        item.id === id && item.size === size
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    );
+  };
+
+  const removeFromCart = (id: string | number, size: string) => {
+    setItems((prevItems) => 
+      prevItems.filter((item) => !(item.id === id && item.size === size))
+    );
+  };
+
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error('Error signing out');
+    } else {
+      setItems([]);
+      localStorage.removeItem('cart');
+      navigate('/');
+      toast.success('Logged out successfully');
+    }
+  };
+
+  if (!isInitialized) {
+    return null;
+  }
+
   return (
-    <CartContext.Provider value={{ items, addToCart, isAuthenticated }}>
+    <CartContext.Provider value={{ 
+      items, 
+      addToCart, 
+      removeFromCart,
+      updateQuantity,
+      isAuthenticated,
+      userEmail,
+      logout 
+    }}>
       {children}
     </CartContext.Provider>
   );
 };
 
+export { CartContext, CartProvider };
 export default CartProvider;

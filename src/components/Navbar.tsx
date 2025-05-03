@@ -1,11 +1,20 @@
-
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Button } from '@/components/ui/button';
-import { User, Heart, ShoppingBag, Menu, X, Home, Search } from 'lucide-react';
+import { User, Heart, ShoppingBag, Menu, X, Home, Search, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { CartContext } from '@/context/CartContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated, userEmail, logout } = useContext(CartContext);
   
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -23,15 +32,33 @@ const Navbar: React.FC = () => {
                 {mobileMenuOpen ? <X /> : <Menu />}
               </Button>
             </div>
-            
-            {/* Login Button for desktop */}
+
+            {/* Desktop Links */}
             <div className="hidden md:flex flex-1 items-center">
-              <Button variant="outline" size="sm" className="flex items-center gap-2" asChild>
-                <Link to="/login">
-                  <User className="h-4 w-4" />
-                  <span>Login</span>
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>{userEmail}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={logout} className="text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="outline" size="sm" className="flex items-center gap-2" asChild>
+                  <Link to="/login">
+                    <User className="h-4 w-4" />
+                    <span>Login</span>
+                  </Link>
+                </Button>
+              )}
             </div>
 
             {/* Logo */}
@@ -41,19 +68,24 @@ const Navbar: React.FC = () => {
 
             {/* Icons */}
             <div className="flex items-center gap-4 flex-1 justify-end">
-              <Button variant="ghost" size="icon" asChild>
-                <Link to="/login">
-                  <User className="h-5 w-5 md:hidden" />
-                </Link>
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Heart className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" asChild>
-                <Link to="/cart">
-                  <ShoppingBag className="h-5 w-5" />
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <>
+                  <Button variant="ghost" size="icon">
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to="/cart">
+                      <ShoppingBag className="h-5 w-5" />
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/login">
+                    <User className="h-5 w-5" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
           
@@ -73,12 +105,19 @@ const Navbar: React.FC = () => {
               <Link to="/hoodies" className="text-sm font-medium py-2 border-b">HOODIES</Link>
               <Link to="/truckers" className="text-sm font-medium py-2 border-b">TRUCKERS</Link>
               
-              <Button variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2" asChild>
-                <Link to="/login">
-                  <User className="h-4 w-4" />
-                  <span>Login</span>
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <Button onClick={logout} variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2">
+                  <LogOut className="h-4 w-4" />
+                  <span>Log out</span>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2" asChild>
+                  <Link to="/login">
+                    <User className="h-4 w-4" />
+                    <span>Login</span>
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -99,10 +138,17 @@ const Navbar: React.FC = () => {
             <ShoppingBag className="h-5 w-5" />
             <span className="text-xs mt-1">Cart</span>
           </Link>
-          <Link to="/login" className="flex flex-col items-center">
-            <User className="h-5 w-5" />
-            <span className="text-xs mt-1">Account</span>
-          </Link>
+          {isAuthenticated ? (
+            <button onClick={logout} className="flex flex-col items-center">
+              <LogOut className="h-5 w-5" />
+              <span className="text-xs mt-1">Logout</span>
+            </button>
+          ) : (
+            <Link to="/login" className="flex flex-col items-center">
+              <User className="h-5 w-5" />
+              <span className="text-xs mt-1">Account</span>
+            </Link>
+          )}
         </div>
       </div>
 

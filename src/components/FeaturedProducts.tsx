@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import ProductCard from './ProductCard';
-import { useProducts, Product } from '@/hooks/useProducts';
+import { useProducts } from '@/hooks/useProducts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -11,6 +10,9 @@ const FeaturedProducts: React.FC = () => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [maxScroll, setMaxScroll] = useState(0);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Only show first 3 products for new arrivals
+  const newArrivals = products?.slice(0, 3);
 
   React.useEffect(() => {
     if (scrollRef.current) {
@@ -45,7 +47,7 @@ const FeaturedProducts: React.FC = () => {
 
   const renderProductSkeleton = () => (
     <>
-      {[...Array(4)].map((_, idx) => (
+      {[...Array(3)].map((_, idx) => (
         <div key={idx} className="flex flex-col gap-2 min-w-[250px] md:min-w-[300px]">
           <Skeleton className="h-64 w-full" />
           <Skeleton className="h-4 w-20" />
@@ -91,7 +93,7 @@ const FeaturedProducts: React.FC = () => {
           className="flex space-x-6 overflow-x-auto hide-scrollbar scroll-smooth pb-6"
         >
           {isLoading ? renderProductSkeleton() : (
-            products?.map(product => (
+            newArrivals?.map((product, index) => (
               <div 
                 key={product.id} 
                 className="min-w-[250px] md:min-w-[300px]"
@@ -101,7 +103,7 @@ const FeaturedProducts: React.FC = () => {
                   name={product.name}
                   designer="FLVUNT BASICS"
                   price={`R ${product.price.toFixed(2)}`}
-                  imageUrl={product.image_url}
+                  imageUrl={`/images/shirts/image${index + 1}.jpg`}
                   isNew={true}
                   description={product.description}
                 />

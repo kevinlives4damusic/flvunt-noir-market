@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -15,19 +15,30 @@ const Login = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (data: any) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: data.password });
+    const { error } = await supabase.auth.signInWithPassword({ 
+      email: data.email, 
+      password: data.password 
+    });
+    
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast.error('Error logging in', { description: error.message });
     } else {
-      toast({ title: 'Logged in', description: 'Welcome back!', variant: 'default' });
-      navigate('/');
+      toast.success('Welcome back!');
+      // Redirect to home page and scroll to New Arrivals
+      navigate('/?section=new-arrivals');
     }
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/?section=new-arrivals`
+      }
+    });
+    
     if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast.error('Error logging in', { description: error.message });
     }
   };
 

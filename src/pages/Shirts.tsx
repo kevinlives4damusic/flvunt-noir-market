@@ -1,15 +1,18 @@
-
-import React, { useContext } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { CartContext } from '@/context/CartContext';
-import { useProducts } from '@/hooks/useProducts';
+import ProductCard from '@/components/ProductCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Shirts = () => {
-  const { addToCart } = useContext(CartContext);
-  const { data: products, isLoading } = useProducts("shirts");
+  // Mock data for 9 shirts
+  const shirts = Array.from({ length: 9 }, (_, i) => ({
+    id: String(i + 1),
+    name: `FLVUNT Classic Shirt ${i + 1}`,
+    price: 399.99,
+    description: "Premium quality street style shirt with modern design.",
+    image_url: `/images/shirts/image${i + 1}.jpg`
+  }));
 
   const renderProductSkeleton = () => (
     <>
@@ -32,28 +35,17 @@ const Shirts = () => {
       <div className="flex-grow py-12 flvunt-container">
         <h1 className="text-3xl font-light tracking-wider mb-8">SHIRTS</h1>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isLoading ? renderProductSkeleton() : (
-            products?.map((product) => (
-              <div key={product.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <img src={product.image_url} alt={product.name} className="w-full h-64 object-cover" />
-                <div className="p-4">
-                  <h2 className="text-lg font-medium">{product.name}</h2>
-                  <p className="text-gray-600">R {product.price.toFixed(2)}</p>
-                  <Button 
-                    className="flvunt-button w-full mt-4" 
-                    onClick={() => addToCart({
-                      id: Number(product.id),
-                      name: product.name,
-                      price: product.price,
-                      image: product.image_url
-                    })}
-                  >
-                    ADD TO CART
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+          {shirts.map((product) => (
+            <ProductCard
+              key={product.id}
+              id={product.id}
+              name={product.name}
+              designer="FLVUNT BASICS"
+              price={`R ${product.price.toFixed(2)}`}
+              imageUrl={product.image_url}
+              description={product.description}
+            />
+          ))}
         </div>
       </div>
       <Footer />

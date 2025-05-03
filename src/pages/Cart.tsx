@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,20 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CartContext } from '@/context/CartContext';
 
-const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
+interface CartItemProps {
+  item: {
+    id: string | number;
+    name: string;
+    price: number;
+    quantity: number;
+    image: string;
+    size: string;
+  };
+  onRemove: (id: string | number, size: string) => void;
+  onUpdateQuantity: (id: string | number, size: string, newQuantity: number) => void;
+}
+
+const CartItem: React.FC<CartItemProps> = ({ item, onRemove, onUpdateQuantity }) => {
   return (
     <div className="flex flex-col sm:flex-row py-6 border-b">
       <div className="w-full sm:w-1/4 aspect-square mb-4 sm:mb-0">
@@ -22,10 +34,10 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
         <div className="flex justify-between mb-4">
           <div>
             <h3 className="text-lg font-medium">{item.name}</h3>
-            <p className="text-gray-600 text-sm mt-1">Size: M</p>
+            <p className="text-gray-600 text-sm mt-1">Size: {item.size}</p>
           </div>
           <button 
-            onClick={() => onRemove(item.id)} 
+            onClick={() => onRemove(item.id, item.size)} 
             className="text-gray-500 hover:text-black"
           >
             <Trash className="h-5 w-5" />
@@ -35,7 +47,7 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
           <div className="flex border border-gray-300">
             <button 
               className="px-3 py-1 border-r border-gray-300"
-              onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
+              onClick={() => onUpdateQuantity(item.id, item.size, Math.max(1, item.quantity - 1))}
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -44,7 +56,7 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
             </span>
             <button 
               className="px-3 py-1 border-l border-gray-300"
-              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+              onClick={() => onUpdateQuantity(item.id, item.size, item.quantity + 1)}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -57,37 +69,21 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
 };
 
 const Cart = () => {
-  const { items, isAuthenticated } = useContext(CartContext);
+  const { items, removeFromCart, updateQuantity, isAuthenticated } = useContext(CartContext);
   const navigate = useNavigate();
-  const [localItems, setLocalItems] = React.useState(items);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast('Please log in to view your cart', {
-        description: 'You need to be logged in to shop'
-      });
       navigate('/login');
     }
-    
-    setLocalItems(items);
-  }, [isAuthenticated, items, navigate]);
+  }, [isAuthenticated, navigate]);
 
-  const removeItem = (id: number | string) => {
-    setLocalItems(localItems.filter(item => item.id !== id));
-    toast('Item removed', {
-      description: "The item has been removed from your cart."
-    });
+  const handleRemove = (id: string | number, size: string) => {
+    removeFromCart(id, size);
+    toast.success('Item removed from cart');
   };
 
-  const updateQuantity = (id: number | string, quantity: number) => {
-    setLocalItems(localItems.map(item => 
-      item.id === id ? { ...item, quantity } : item
-    ));
-  };
-
-  const subtotal = localItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = 4.99;
-  const total = subtotal + shipping;
+  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
   if (!isAuthenticated) {
     return null; // Will redirect in useEffect
@@ -102,63 +98,60 @@ const Cart = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Continue shopping
           </Link>
-          <h1 className="mt-4 text-3xl font-light tracking-wider">YOUR CART</h1>
+          <h1 className="mt-4 text-3xl font-light tracking-wider">SHOPPING BAG</h1>
         </div>
 
-        {localItems.length === 0 ? (
-          <div className="py-16 text-center">
-            <h2 className="text-xl mb-4">Your cart is empty</h2>
-            <p className="text-gray-600 mb-8">Looks like you haven't added anything to your cart yet.</p>
-            <Button asChild className="flvunt-button">
-              <Link to="/">START SHOPPING</Link>
-            </Button>
+        <div className="flex flex-col lg:flex-row gap-12">
+          <div className="flex-1">
+            {items.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-xl text-gray-500 mb-2">Your cart is empty</p>
+                <p className="text-gray-400 mb-8">Add some items to your cart to see them here</p>
+                <Button asChild className="flvunt-button">
+                  <Link to="/shirts">SHOP NOW</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {items.map((item) => (
+                  <CartItem 
+                    key={`${item.id}-${item.size}`}
+                    item={item}
+                    onRemove={handleRemove}
+                    onUpdateQuantity={updateQuantity}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex flex-col lg:flex-row gap-12">
-            <div className="flex-1">
-              {localItems.map(item => (
-                <CartItem 
-                  key={item.id} 
-                  item={item} 
-                  onRemove={removeItem} 
-                  onUpdateQuantity={updateQuantity}
-                />
-              ))}
-            </div>
-            
-            <div className="w-full lg:w-96 bg-gray-50 p-6">
-              <h2 className="text-xl font-medium mb-6">Order Summary</h2>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <p>Subtotal</p>
-                  <p>R {subtotal.toFixed(2)}</p>
-                </div>
-                <div className="flex justify-between">
-                  <p>Shipping</p>
-                  <p>R {shipping.toFixed(2)}</p>
-                </div>
-                <div className="border-t pt-3 mt-3 flex justify-between font-medium text-lg">
-                  <p>Total</p>
-                  <p>R {total.toFixed(2)}</p>
+
+          {items.length > 0 && (
+            <div className="lg:w-80">
+              <div className="sticky top-24">
+                <div className="bg-gray-50 p-6">
+                  <h2 className="text-lg font-medium mb-4">Order Summary</h2>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span>R {subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Shipping</span>
+                      <span>Calculated at checkout</span>
+                    </div>
+                  </div>
+                  <div className="border-t my-4"></div>
+                  <Button 
+                    className="flvunt-button w-full" 
+                    onClick={() => navigate('/checkout')}
+                  >
+                    PROCEED TO CHECKOUT
+                  </Button>
                 </div>
               </div>
-              
-              <Button 
-                className="flvunt-button w-full mt-6"
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    navigate('/login');
-                    return;
-                  }
-                  navigate('/checkout');
-                }}
-              >
-                CHECKOUT
-              </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       <Footer />
     </div>

@@ -1,10 +1,9 @@
-
 import React, { useContext, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Eye, Heart, ShoppingBag } from 'lucide-react';
 import { CartContext } from '@/context/CartContext';
 import { useNavigate } from 'react-router-dom';
-import { toastWithProgress } from './ui/toast-with-progress';
+import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import ProductQuickView from './ProductQuickView';
 
@@ -35,10 +34,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [quickViewOpen, setQuickViewOpen] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   
   const handleAddToCart = () => {
     if (!isAuthenticated) {
       navigate('/login');
+      return;
+    }
+
+    if (!selectedSize) {
+      setQuickViewOpen(true);
       return;
     }
     
@@ -46,13 +51,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
       id,
       name,
       price: parseFloat(price.replace('R ', '')),
-      image: imageUrl
+      image: imageUrl,
+      size: selectedSize
     });
 
-    toastWithProgress({ 
-      message: 'Added to cart', 
+    toast.success('Added to cart', { 
       description: `${name} has been added to your cart` 
     });
+  };
+
+  const handleWishlist = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    toast.success('Added to wishlist');
   };
 
   const handleImageLoad = () => {
@@ -101,6 +114,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             variant="outline" 
             size="icon" 
             className="absolute top-2 right-2 bg-white hover:bg-flvunt-black hover:text-white rounded-full h-8 w-8"
+            onClick={handleWishlist}
           >
             <Heart className="h-4 w-4" />
           </Button>
@@ -145,7 +159,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           description
         } : null}
         open={quickViewOpen}
-        onOpenChange={setQuickViewOpen}
+        onOpenChange={(isOpen) => {
+          setQuickViewOpen(isOpen);
+          if (!isOpen) setSelectedSize(null);
+        }}
       />
     </>
   );
