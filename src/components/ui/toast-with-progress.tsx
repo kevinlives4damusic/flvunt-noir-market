@@ -13,7 +13,8 @@ export const toastWithProgress = ({ message, description, duration = 4000 }: Toa
   const toastId = toast(message, {
     description,
     duration,
-    render: ({ id }) => {
+    // Use custom instead of render for custom toast components
+    custom: ({ id }) => {
       const [progress, setProgress] = useState(0);
       
       useEffect(() => {
