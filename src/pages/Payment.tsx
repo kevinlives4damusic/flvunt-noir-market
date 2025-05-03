@@ -31,8 +31,7 @@ const Payment = () => {
       return;
     }
     
-    toast({
-      title: "Payment initiated",
+    toast('Payment initiated', {
       description: "This is a demo. Payment processing requires backend integration."
     });
   };

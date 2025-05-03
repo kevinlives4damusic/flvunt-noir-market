@@ -74,8 +74,7 @@ const Cart = () => {
 
   const removeItem = (id: number | string) => {
     setLocalItems(localItems.filter(item => item.id !== id));
-    toast({
-      title: "Item removed",
+    toast('Item removed', {
       description: "The item has been removed from your cart."
     });
   };
