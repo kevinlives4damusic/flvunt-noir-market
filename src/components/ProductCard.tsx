@@ -1,7 +1,9 @@
 
-import React from 'react';
+import React, { useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
+import { CartContext } from '@/context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
 interface ProductCardProps {
   id: string;
@@ -24,6 +26,23 @@ const ProductCard: React.FC<ProductCardProps> = ({
   isSale = false,
   salePrice
 }) => {
+  const { addToCart, isAuthenticated } = useContext(CartContext);
+  const navigate = useNavigate();
+  
+  const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
+    addToCart({
+      id,
+      name,
+      price: parseFloat(price.replace('R ', '')),
+      image: imageUrl
+    });
+  };
+
   return (
     <div className="group relative">
       {/* Image container */}
@@ -36,7 +55,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
         
         {/* Overlay */}
         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity duration-300 flex items-end justify-center opacity-0 group-hover:opacity-100">
-          <Button className="flvunt-button mb-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+          <Button 
+            className="flvunt-button mb-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300"
+            onClick={handleAddToCart}
+          >
             ADD TO BAG
           </Button>
         </div>

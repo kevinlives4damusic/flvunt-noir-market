@@ -1,28 +1,12 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+
+import React, { useContext, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ArrowLeft, Trash, Plus, Minus } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-// Example cart items for demonstration
-const cartItems = [
-  {
-    id: 1,
-    name: 'Black Oversized T-Shirt',
-    price: 49.99,
-    quantity: 1,
-    image: '/lovable-uploads/dc882ecd-e64c-4708-842e-fff34bdcd2e2.png'
-  },
-  {
-    id: 2,
-    name: 'Logo Hoodie - Limited Edition',
-    price: 89.99,
-    quantity: 2,
-    image: '/lovable-uploads/dc882ecd-e64c-4708-842e-fff34bdcd2e2.png'
-  }
-];
+import { CartContext } from '@/context/CartContext';
 
 const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
   return (
@@ -73,25 +57,42 @@ const CartItem = ({ item, onRemove, onUpdateQuantity }: any) => {
 };
 
 const Cart = () => {
-  const [items, setItems] = React.useState(cartItems);
+  const { items, isAuthenticated } = useContext(CartContext);
+  const navigate = useNavigate();
+  const [localItems, setLocalItems] = React.useState(items);
 
-  const removeItem = (id: number) => {
-    setItems(items.filter(item => item.id !== id));
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast('Please log in to view your cart', {
+        description: 'You need to be logged in to shop'
+      });
+      navigate('/login');
+    }
+    
+    setLocalItems(items);
+  }, [isAuthenticated, items, navigate]);
+
+  const removeItem = (id: number | string) => {
+    setLocalItems(localItems.filter(item => item.id !== id));
     toast({
       title: "Item removed",
       description: "The item has been removed from your cart."
     });
   };
 
-  const updateQuantity = (id: number, quantity: number) => {
-    setItems(items.map(item => 
+  const updateQuantity = (id: number | string, quantity: number) => {
+    setLocalItems(localItems.map(item => 
       item.id === id ? { ...item, quantity } : item
     ));
   };
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = localItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 4.99;
   const total = subtotal + shipping;
+
+  if (!isAuthenticated) {
+    return null; // Will redirect in useEffect
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -105,7 +106,7 @@ const Cart = () => {
           <h1 className="mt-4 text-3xl font-light tracking-wider">YOUR CART</h1>
         </div>
 
-        {items.length === 0 ? (
+        {localItems.length === 0 ? (
           <div className="py-16 text-center">
             <h2 className="text-xl mb-4">Your cart is empty</h2>
             <p className="text-gray-600 mb-8">Looks like you haven't added anything to your cart yet.</p>
@@ -116,7 +117,7 @@ const Cart = () => {
         ) : (
           <div className="flex flex-col lg:flex-row gap-12">
             <div className="flex-1">
-              {items.map(item => (
+              {localItems.map(item => (
                 <CartItem 
                   key={item.id} 
                   item={item} 
@@ -146,18 +147,15 @@ const Cart = () => {
               
               <Button 
                 className="flvunt-button w-full mt-6"
-                onClick={() => toast({
-                  title: "Checkout initiated",
-                  description: "This is a demo. Checkout functionality requires backend integration."
-                })}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    navigate('/login');
+                    return;
+                  }
+                  navigate('/checkout');
+                }}
               >
                 CHECKOUT
-              </Button>
-              <Button 
-                className="flvunt-button w-full mt-4"
-                asChild
-              >
-                <Link to="/checkout">PROCEED TO CHECKOUT</Link>
               </Button>
             </div>
           </div>

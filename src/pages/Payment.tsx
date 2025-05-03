@@ -1,25 +1,45 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+
+import React, { useContext, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-// Example order summary for demonstration
-const orderSummary = {
-  subtotal: 229.97,
-  shipping: 4.99,
-  total: 234.96
-};
+import { CartContext } from '@/context/CartContext';
 
 const Payment = () => {
+  const { isAuthenticated, items } = useContext(CartContext);
+  const navigate = useNavigate();
+
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const shipping = 4.99;
+  const total = subtotal + shipping;
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      toast('Please log in to proceed with payment', {
+        description: 'You need to be logged in to complete your purchase'
+      });
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handlePayment = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    
     toast({
       title: "Payment initiated",
       description: "This is a demo. Payment processing requires backend integration."
     });
   };
+
+  if (!isAuthenticated) {
+    return null; // Will redirect in useEffect
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -51,15 +71,15 @@ const Payment = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <p>Subtotal</p>
-                <p>R {orderSummary.subtotal.toFixed(2)}</p>
+                <p>R {subtotal.toFixed(2)}</p>
               </div>
               <div className="flex justify-between">
                 <p>Shipping</p>
-                <p>R {orderSummary.shipping.toFixed(2)}</p>
+                <p>R {shipping.toFixed(2)}</p>
               </div>
               <div className="border-t pt-3 mt-3 flex justify-between font-medium text-lg">
                 <p>Total</p>
-                <p>R {orderSummary.total.toFixed(2)}</p>
+                <p>R {total.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -70,4 +90,4 @@ const Payment = () => {
   );
 };
 
-export default Payment; 
+export default Payment;
