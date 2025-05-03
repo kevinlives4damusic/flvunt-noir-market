@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +16,7 @@ import Shirts from "./pages/Shirts";
 import Truckers from "./pages/Truckers";
 import CartProvider from "./context/CartContext";
 
+// Create QueryClient for React Query
 const queryClient = new QueryClient();
 
 const App = () => (

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,23 +8,50 @@ import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Separator } from '@/components/ui/separator';
+import { supabase } from '@/lib/supabase';
 
 const Signup = () => {
   const { register, handleSubmit, formState: { errors }, watch } = useForm();
 
-  const onSubmit = (data: any) => {
-    console.log(data);
-    toast({
-      title: "Account created",
-      description: "This is a demo. Registration functionality requires backend integration."
+  const onSubmit = async (data: any) => {
+    const { error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          first_name: data.firstName,
+          last_name: data.lastName
+        }
+      }
     });
+
+    if (error) {
+      toast({
+        title: "Registration failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Account created",
+        description: "Please check your email for verification instructions.",
+        variant: "default"
+      });
+    }
   };
 
-  const handleGoogleSignup = () => {
-    toast({
-      title: "Google signup attempted",
-      description: "This is a demo. Google signup functionality requires backend integration."
+  const handleGoogleSignup = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google'
     });
+    
+    if (error) {
+      toast({
+        title: "Google signup failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   return (

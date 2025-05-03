@@ -19,7 +19,7 @@ const Login = () => {
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
-      toast({ title: 'Logged in', description: 'Welcome back!', variant: 'success' });
+      toast({ title: 'Logged in', description: 'Welcome back!', variant: 'default' });
       navigate('/');
     }
   };
