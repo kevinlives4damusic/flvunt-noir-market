@@ -1,7 +1,8 @@
+
 import React, { createContext, useState, ReactNode } from 'react';
 
 interface CartItem {
-  id: number;
+  id: number | string;
   name: string;
   price: number;
   quantity: number;
@@ -41,4 +42,4 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
-export default CartProvider; 
+export default CartProvider;
