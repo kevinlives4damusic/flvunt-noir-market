@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogTitle, 
   DialogHeader,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CartContext } from '@/context/CartContext';
@@ -97,13 +98,17 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
           <div className="p-6 flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-xl font-normal">{product.name}</DialogTitle>
-              <p className="text-lg font-medium mt-2">R {product.price.toFixed(2)}</p>
+              <DialogDescription asChild>
+                <div>
+                  <p className="text-lg font-medium mt-2">R {product.price.toFixed(2)}</p>
+                  <p className="text-gray-600 text-sm mt-4">
+                    {product.description || "This premium FLVUNT product combines style and comfort, designed for those who appreciate quality streetwear with a modern edge."}
+                  </p>
+                </div>
+              </DialogDescription>
             </DialogHeader>
             
             <div className="mt-4 flex-grow">
-              <p className="text-gray-600 text-sm">
-                {product.description || "This premium FLVUNT product combines style and comfort, designed for those who appreciate quality streetwear with a modern edge."}
-              </p>
               
               <div className="mt-6">
                 <h4 className="font-medium text-sm mb-2">Size</h4>

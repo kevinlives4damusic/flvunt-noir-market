@@ -1,16 +1,13 @@
 import axios from 'axios';
 
-// Determine the API base URL based on environment
-const isProduction = import.meta.env.PROD;
-const apiBaseUrl = isProduction 
-  ? '/.netlify/functions'  // When deployed to GitHub Pages with Netlify Functions
-  : '/api';               // Local development with Express server
+const apiBaseUrl = '/.netlify/functions';  // Always use Netlify Functions
 
 // Create an axios instance for API calls
 const apiClient = axios.create({
   baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
   timeout: 15000,
 });
@@ -22,7 +19,8 @@ export const createCheckout = async (
   successUrl?: string,
   cancelUrl?: string,
   failureUrl?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
+  saveCard: boolean = false
 ) => {
   try {
     const response = await apiClient.post('/create-yoco-checkout', {
@@ -31,9 +29,10 @@ export const createCheckout = async (
       successUrl,
       cancelUrl,
       failureUrl,
-      metadata
+      metadata,
+      saveCard
     });
-    
+
     return {
       success: true,
       data: response.data

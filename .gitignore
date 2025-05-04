@@ -1,32 +1,41 @@
-# Logs
-logs
-*.log
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+/dist
+
+# misc
+.DS_Store
+*.pem
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Environment variables
-.env
+# local env files
 .env*.local
 
-# Vite / Vue specific
-.vite
-coverage 
+# typescript
+*.tsbuildinfo
+
+# Supabase
+/supabase/.temp
+
+# IDE
+.vscode/
+.idea/
+
+# Vite
+*.timestamp-*.mjs

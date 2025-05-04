@@ -1,5 +1,6 @@
+
 import React, { useContext, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, CreditCard, Shield } from 'lucide-react';
@@ -7,9 +8,13 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CartContext } from '@/context/CartContext';
 import BackToTop from '@/components/BackToTop';
-import { toastWithProgress } from '@/components/ui/toast-with-progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { createOrder } from '@/lib/orderService';
+import { PaymentProcessor } from '@/components/checkout/PaymentProcessor';
+import { PaymentVerification } from '@/components/checkout/PaymentVerification';
+import { initiateYocoCheckout } from '@/lib/yoco';
 
+// Payment method option component
 const PaymentMethod = ({ 
   id, 
   name, 
@@ -38,17 +43,21 @@ const PaymentMethod = ({
 );
 
 const Payment = () => {
-  const { isAuthenticated, items } = useContext(CartContext);
+  const { isAuthenticated, items, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [searchParams] = useSearchParams();
+  const [paymentMethod, setPaymentMethod] = useState('yoco');
   const [processing, setProcessing] = useState(false);
-  
-  // New state for card inputs with validation
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [saveCard, setSaveCard] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [nameOnCard, setNameOnCard] = useState('');
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Check if we're returning from a payment provider
+  const isVerifying = searchParams.has('payment_id') || searchParams.has('status');
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 4.99;
@@ -63,142 +72,221 @@ const Payment = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Card number formatter and validator
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value;
-    // Remove all non-digit characters
-    let value = input.replace(/\D/g, '');
-    
-    // Limit to 16 digits (common credit card length)
-    if (value.length > 16) {
-      value = value.slice(0, 16);
-    }
-    
-    // Format with spaces after every 4 digits
-    let formattedValue = '';
-    for (let i = 0; i < value.length; i++) {
-      if (i > 0 && i % 4 === 0) {
-        formattedValue += ' ';
+  // Create a new order in the database
+  const createNewOrder = async () => {
+    try {
+      setProcessing(true);
+      
+      // Generate a unique order number
+      const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      
+      // Create the order in the database
+      const orderData = {
+        orderNumber,
+        items: items.map(item => ({
+          product_id: item.id.toString(),
+          quantity: item.quantity,
+          price_cents: Math.round(item.price * 100),
+          metadata: {
+            name: item.name,
+            image: item.image
+          }
+        })),
+        amount_cents: Math.round(total * 100),
+        currency: 'ZAR',
+        metadata: {
+          customer_email: 'customer@example.com' // This would come from user profile
+        }
+      };
+      
+      const result = await createOrder(orderData);
+      
+      if (result.success && result.data) {
+        setOrderId(result.data.id);
+        return result.data.id;
+      } else {
+        throw new Error(result.error || 'Failed to create order');
       }
-      formattedValue += value[i];
-    }
-    
-    setCardNumber(formattedValue);
-    
-    // Clear error if field is valid
-    if (value.length >= 13 && value.length <= 16) {
-      setFormErrors(prev => ({ ...prev, cardNumber: '' }));
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create order. Please try again.');
+      setProcessing(false);
+      return null;
     }
   };
-
-  // Expiry date formatter and validator
-  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value;
-    // Remove all non-digit characters
-    let value = input.replace(/\D/g, '');
-    
-    // Limit to 4 digits (MMYY)
-    if (value.length > 4) {
-      value = value.slice(0, 4);
-    }
-    
-    // Format as MM/YY
-    if (value.length > 2) {
-      value = value.slice(0, 2) + '/' + value.slice(2);
-    }
-    
-    setExpiryDate(value);
-    
-    // Clear error if field is valid
-    if (value.length === 4) {
-      setFormErrors(prev => ({ ...prev, expiryDate: '' }));
+  
+  // Handle successful payment
+  const handlePaymentSuccess = (paymentId: string) => {
+    setPaymentSuccess(true);
+    toast.success('Payment successful!');
+    clearCart();
+    navigate(`/payment-success?orderId=${orderId}&paymentId=${paymentId}`);
+  };
+  
+  // Handle payment error
+  const handlePaymentError = (error: string) => {
+    toast.error(`Payment failed: ${error}`);
+    setProcessing(false);
+    if (orderId) {
+      navigate(`/payment-failure?orderId=${orderId}`);
     }
   };
-
-  // CVV validator
-  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value;
-    // Remove all non-digit characters
-    let value = input.replace(/\D/g, '');
-    
-    // Limit to 3 or 4 digits
-    if (value.length > 4) {
-      value = value.slice(0, 4);
-    }
-    
-    setCvv(value);
-    
-    // Clear error if field is valid
-    if (value.length >= 3 && value.length <= 4) {
-      setFormErrors(prev => ({ ...prev, cvv: '' }));
+  
+  // Handle payment cancellation
+  const handlePaymentCancel = () => {
+    setProcessing(false);
+    toast('Payment cancelled');
+    if (orderId) {
+      navigate(`/payment-cancel?orderId=${orderId}`);
     }
   };
-
-  // Validate all fields before submitting
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
+  
+  // Format card number with spaces after every 4 digits
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
     
-    // Card number validation
-    const cardDigits = cardNumber.replace(/\D/g, '');
-    if (!cardDigits || cardDigits.length < 13 || cardDigits.length > 16) {
-      errors.cardNumber = 'Please enter a valid card number';
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
     }
     
-    // Expiry date validation
-    const expiryDigits = expiryDate.replace(/\D/g, '');
-    if (expiryDigits.length !== 4) {
-      errors.expiryDate = 'Please enter a valid expiry date (MM/YY)';
+    if (parts.length) {
+      return parts.join(' ');
     } else {
-      const month = parseInt(expiryDigits.substring(0, 2));
-      if (month < 1 || month > 12) {
-        errors.expiryDate = 'Please enter a valid month (01-12)';
-      }
+      return value;
     }
-    
-    // CVV validation
-    if (!cvv || cvv.length < 3) {
-      errors.cvv = 'Please enter a valid CVV';
-    }
-    
-    // Name validation
-    if (!nameOnCard.trim()) {
-      errors.nameOnCard = 'Please enter the name on your card';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
   };
-
-  const handlePayment = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
+  
+  // Format expiry date as MM/YY
+  const formatExpiryDate = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    
+    if (v.length >= 3) {
+      return `${v.substring(0, 2)}/${v.substring(2)}`;
+    } else {
+      return v;
+    }
+  };
+  
+  // Handle card number input change
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedValue = formatCardNumber(e.target.value);
+    setCardNumber(formattedValue);
+  };
+  
+  // Handle expiry date input change
+  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedValue = formatExpiryDate(e.target.value);
+    setExpiryDate(formattedValue);
+  };
+  
+  // Handle CVV input change
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setCvv(value);
+  };
+  
+  // Handle name on card input change
+  const handleNameOnCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNameOnCard(e.target.value);
+  };
+  
+  // Handle payment initiation
+  const handlePayment = async () => {
+    if (processing) return;
+    
+    // Basic validation
+    if (!cardNumber || !expiryDate || !cvv || !nameOnCard) {
+      toast.error('Please fill in all card details');
       return;
     }
     
-    // Validate form fields first
-    if (!validateForm()) {
-      toast('Please check your payment information', {
-        description: 'Some fields contain errors or are incomplete'
-      });
-      return;
-    }
-    
+    // Set processing state
     setProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessing(false);
-      toastWithProgress({
-        message: 'Payment successful!',
-        description: "Your order has been placed and will be processed shortly."
-      });
+    try {
+      // Create a new order first
+      const newOrderId = await createNewOrder();
+      if (!newOrderId) {
+        setProcessing(false);
+        return;
+      }
       
-      // Redirect after successful payment
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-    }, 1500);
+      // For non-Yoco payment methods, you would implement different logic here
+      if (paymentMethod !== 'yoco') {
+        toast.error('Only Yoco payments are supported at this time');
+        setProcessing(false);
+        return;
+      }
+      
+      // Set up URLs for payment flow
+      const baseUrl = window.location.origin;
+      const successUrl = `${baseUrl}/payment-success?orderId=${newOrderId}`;
+      const cancelUrl = `${baseUrl}/payment-cancel?orderId=${newOrderId}`;
+      const failureUrl = `${baseUrl}/payment-failure?orderId=${newOrderId}`;
+      
+      // Process the payment directly with Yoco
+      try {
+        // Create metadata with card and order details
+        const metadata = {
+          orderId: newOrderId,
+          cardDetails: {
+            last4: cardNumber.replace(/\s/g, '').slice(-4),
+            expiryMonth: expiryDate.split('/')[0],
+            expiryYear: `20${expiryDate.split('/')[1]}`,
+            nameOnCard
+          }
+        };
+        
+        // Initiate Yoco checkout directly
+        const result = await initiateYocoCheckout(
+          Math.round(total * 100),  // amount in cents
+          'ZAR',                    // currency
+          successUrl,               // success URL
+          cancelUrl,                // cancel URL
+          failureUrl,               // failure URL
+          metadata,                 // metadata
+          saveCard                  // save card option
+        );
+        
+        if (!result.success || !result.data?.redirectUrl) {
+          throw new Error(result.error ? 
+            (typeof result.error === 'string' ? result.error : result.error.message) : 
+            'Payment creation failed');
+        }
+        
+        // Redirect to the Yoco checkout page
+        window.location.href = result.data.redirectUrl;
+      } catch (error) {
+        console.error('Payment processing error:', error);
+        handlePaymentError(error instanceof Error ? error.message : 'Payment processing failed');
+      }
+      
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('An error occurred during payment processing');
+      setProcessing(false);
+    }
   };
+
+  // Show verification component if we're verifying a payment
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-grow py-12 flvunt-container">
+          <PaymentVerification 
+            onSuccess={handlePaymentSuccess}
+            onError={handlePaymentError}
+          />
+        </div>
+        <Footer />
+        <BackToTop />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null; // Will redirect in useEffect
@@ -223,106 +311,104 @@ const Payment = () => {
               
               <div className="space-y-3 mb-6">
                 <PaymentMethod 
-                  id="card" 
+                  id="yoco" 
                   name="Credit/Debit Card" 
                   icon={<CreditCard className="h-5 w-5" />} 
-                  selected={paymentMethod === 'card'} 
-                  onSelect={() => setPaymentMethod('card')} 
-                />
-                
-                <PaymentMethod 
-                  id="paypal" 
-                  name="PayPal" 
-                  icon={<img src="/paypal-logo.png" alt="PayPal" className="h-5" />} 
-                  selected={paymentMethod === 'paypal'} 
-                  onSelect={() => setPaymentMethod('paypal')} 
+                  selected={paymentMethod === 'yoco'} 
+                  onSelect={() => setPaymentMethod('yoco')} 
                 />
               </div>
               
-              {paymentMethod === 'card' && (
+              {/* Save card information checkbox */}
+              <div className="mt-6 flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="saveCard"
+                  className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+                  checked={saveCard}
+                  onChange={(e) => setSaveCard(e.target.checked)}
+                />
+                <label htmlFor="saveCard" className="text-sm text-gray-700">
+                  Save my card for future purchases
+                </label>
+              </div>
+              
+              {paymentMethod === 'yoco' && (
                 <div className="space-y-4 animate-fade-in">
-                  <div>
-                    <label className="block text-sm mb-1">Card Number</label>
-                    <input 
-                      type="text" 
-                      placeholder="1234 5678 9012 3456" 
-                      className={`w-full p-2 border ${formErrors.cardNumber ? 'border-red-500' : 'border-gray-300'} rounded`}
-                      value={cardNumber}
-                      onChange={handleCardNumberChange}
-                      maxLength={19} // 16 digits + 3 spaces
-                    />
-                    {formErrors.cardNumber && (
-                      <p className="text-red-500 text-xs mt-1">{formErrors.cardNumber}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm mb-1">Expiry Date</label>
-                      <input 
-                        type="text" 
-                        placeholder="MM/YY" 
-                        className={`w-full p-2 border ${formErrors.expiryDate ? 'border-red-500' : 'border-gray-300'} rounded`}
-                        value={expiryDate}
-                        onChange={handleExpiryDateChange}
-                        maxLength={5} // MM/YY format (5 chars)
+                  {/* Credit Card Input Fields */}
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
+                      <input
+                        type="text"
+                        id="cardNumber"
+                        placeholder="1234 5678 9012 3456"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        maxLength={19}
+                        value={cardNumber}
+                        onChange={handleCardNumberChange}
                       />
-                      {formErrors.expiryDate && (
-                        <p className="text-red-500 text-xs mt-1">{formErrors.expiryDate}</p>
-                      )}
                     </div>
-                    <div className="w-24">
-                      <label className="block text-sm mb-1">CVV</label>
-                      <input 
-                        type="text" 
-                        placeholder="123" 
-                        className={`w-full p-2 border ${formErrors.cvv ? 'border-red-500' : 'border-gray-300'} rounded`}
-                        value={cvv}
-                        onChange={handleCvvChange}
-                        maxLength={4}
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                        <input
+                          type="text"
+                          id="expiryDate"
+                          placeholder="MM/YY"
+                          className="w-full p-2 border border-gray-300 rounded"
+                          maxLength={5}
+                          value={expiryDate}
+                          onChange={handleExpiryDateChange}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV</label>
+                        <input
+                          type="text"
+                          id="cvv"
+                          placeholder="123"
+                          className="w-full p-2 border border-gray-300 rounded"
+                          maxLength={4}
+                          value={cvv}
+                          onChange={handleCvvChange}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="nameOnCard" className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label>
+                      <input
+                        type="text"
+                        id="nameOnCard"
+                        placeholder="John Doe"
+                        className="w-full p-2 border border-gray-300 rounded"
+                        value={nameOnCard}
+                        onChange={handleNameOnCardChange}
                       />
-                      {formErrors.cvv && (
-                        <p className="text-red-500 text-xs mt-1">{formErrors.cvv}</p>
-                      )}
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm mb-1">Name on Card</label>
-                    <input 
-                      type="text" 
-                      placeholder="John Doe" 
-                      className={`w-full p-2 border ${formErrors.nameOnCard ? 'border-red-500' : 'border-gray-300'} rounded`}
-                      value={nameOnCard}
-                      onChange={(e) => {
-                        setNameOnCard(e.target.value);
-                        if (e.target.value.trim()) {
-                          setFormErrors(prev => ({ ...prev, nameOnCard: '' }));
-                        }
-                      }}
-                      maxLength={50}
-                    />
-                    {formErrors.nameOnCard && (
-                      <p className="text-red-500 text-xs mt-1">{formErrors.nameOnCard}</p>
+                  
+                  <button 
+                    className="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition-colors"
+                    onClick={handlePayment}
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <span className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : (
+                      'Pay R ' + total.toFixed(2)
                     )}
-                  </div>
+                  </button>
                 </div>
               )}
-              
-              <div className="mt-8">
-                <Button 
-                  onClick={handlePayment} 
-                  className="flvunt-button w-full relative"
-                  disabled={processing}
-                >
-                  {processing ? (
-                    <>
-                      <span className="animate-pulse">Processing...</span>
-                      <span className="ml-2 inline-block animate-spin">⟳</span>
-                    </>
-                  ) : (
-                    <>PAY NOW</>
-                  )}
-                </Button>
-              </div>
               
               <div className="flex flex-col items-center mt-6">
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
@@ -330,19 +416,23 @@ const Payment = () => {
                   <span>Payment secured by 256-bit encryption</span>
                 </div>
                 
-                {/* Yoco powered badge */}
-                <div className="mt-2 text-center">
-                  <p className="text-xs text-gray-500 mb-1">Secured by</p>
-                  <img 
-                    src="https://cdn.yoco.com/images/assets/logos/yoco-logo.svg" 
-                    alt="Powered by Yoco" 
-                    className="h-6 mx-auto" 
-                    onError={(e) => {
-                      // Fallback text if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.outerHTML = '<span className="text-sm font-medium">YOCO</span>';
-                    }}
-                  />
+                {/* Payment method logos */}
+                <div className="mt-4 text-center border-t pt-4 w-full">
+                  <p className="text-sm text-gray-500 mb-2">We accept</p>
+                  <div className="flex justify-center items-center">
+                    <img 
+                      src="/images/Screenshot-2025-05-04-195325.svg" 
+                      alt="Accepted payment methods" 
+                      className="h-16 mx-auto" 
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.outerHTML = '<div className="flex gap-2 justify-center"><span className="text-sm font-medium">Visa</span><span className="text-sm font-medium">Mastercard</span><span className="text-sm font-medium">American Express</span></div>';
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Your card details are securely processed and protected by 256-bit encryption
+                  </p>
                 </div>
               </div>
             </div>

@@ -17,6 +17,7 @@ interface CartContextType {
   addToCart: (item: Omit<CartItem, 'quantity'>) => void;
   removeFromCart: (id: string | number, size: string) => void;
   updateQuantity: (id: string | number, size: string, newQuantity: number) => void;
+  clearCart: () => void;
   isAuthenticated: boolean;
   userEmail: string | null;
   logout: () => Promise<void>;
@@ -27,6 +28,7 @@ const CartContext = createContext<CartContextType>({
   addToCart: () => {},
   removeFromCart: () => {},
   updateQuantity: () => {},
+  clearCart: () => {},
   isAuthenticated: false,
   userEmail: null,
   logout: async () => {}
@@ -117,6 +119,10 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  const clearCart = () => {
+    setItems([]);
+  };
+
   const logout = async () => {
     // Save cart items before logout
     const cartItems = [...items];
@@ -144,6 +150,7 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
       addToCart, 
       removeFromCart,
       updateQuantity,
+      clearCart,
       isAuthenticated,
       userEmail,
       logout 

@@ -16,6 +16,7 @@ import Shirts from "./pages/Shirts";
 import Truckers from "./pages/Truckers";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
+import PaymentFailure from "./pages/PaymentFailure";
 import Contact from "./pages/Contact";
 import Likes from "./pages/Likes";
 import CartProvider from "./context/CartContext";
@@ -50,6 +51,7 @@ const App = () => {
                 <Route path="/payment" element={<Payment />} />
                 <Route path="/payment-success" element={<PaymentSuccess />} />
                 <Route path="/payment-cancel" element={<PaymentCancel />} />
+                <Route path="/payment-failure" element={<PaymentFailure />} />
                 <Route path="/hoodies" element={<Hoodies />} />
                 <Route path="/shirts" element={<Shirts />} />
                 <Route path="/truckers" element={<Truckers />} />

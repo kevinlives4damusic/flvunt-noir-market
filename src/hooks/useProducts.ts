@@ -10,6 +10,11 @@ export interface Product {
   description?: string;
   image_url: string;
   category: string;
+  designer: string;
+  available_sizes: string[];
+  in_stock: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useProducts(category?: string) {

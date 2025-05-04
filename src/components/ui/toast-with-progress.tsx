@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
@@ -9,42 +8,42 @@ interface ToastWithProgressProps {
   duration?: number;
 }
 
-export const toastWithProgress = ({ message, description, duration = 4000 }: ToastWithProgressProps) => {
-  // Create a component that will be rendered inside the toast
-  const ProgressBar = () => {
-    const [progress, setProgress] = useState(0);
-    
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        const interval = setInterval(() => {
-          setProgress((prev) => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 2;
-          });
-        }, duration / 50);
-        
-        return () => clearInterval(interval);
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }, []);
-    
-    return (
-      <div className="w-full space-y-2">
-        <div>{message}</div>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-        <Progress value={progress} className="h-1" />
-      </div>
-    );
-  };
+export const toastWithProgress = ({ 
+  message, 
+  description, 
+  duration = 2000 
+}: ToastWithProgressProps) => {
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress = Math.min(progress + 1, 100);
+    if (progress === 100) {
+      clearInterval(interval);
+    }
+  }, duration / 100);
 
-  // Use the standard toast API - passing a React component directly is supported
-  const toastId = toast(<ProgressBar />, {
+  return toast(message, {
+    description,
     duration,
+    unstyled: true,
+    className: 'bg-white p-4 rounded-lg shadow-lg border border-gray-200',
+    descriptionClassName: 'text-gray-600 text-sm mt-1',
   });
-  
-  return toastId;
+};
+
+export const toastError = (message: string, description?: string) => {
+  return toast.error(message, {
+    description,
+    unstyled: true,
+    className: 'bg-white p-4 rounded-lg shadow-lg border-l-4 border-red-500',
+    descriptionClassName: 'text-gray-600 text-sm mt-1',
+  });
+};
+
+export const toastSuccess = (message: string, description?: string) => {
+  return toast.success(message, {
+    description,
+    unstyled: true,
+    className: 'bg-white p-4 rounded-lg shadow-lg border-l-4 border-green-500',
+    descriptionClassName: 'text-gray-600 text-sm mt-1',
+  });
 };
