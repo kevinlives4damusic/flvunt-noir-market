@@ -118,12 +118,17 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    // Save cart items before logout
+    const cartItems = [...items];
+    
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast.error('Error signing out');
     } else {
-      setItems([]);
-      localStorage.removeItem('cart');
+      // Restore cart items after logout instead of clearing them
+      setItems(cartItems);
+      // Update localStorage with the preserved cart
+      localStorage.setItem('cart', JSON.stringify(cartItems));
       navigate('/');
       toast.success('Logged out successfully');
     }

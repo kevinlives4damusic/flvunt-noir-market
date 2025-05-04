@@ -70,8 +70,10 @@ const Navbar: React.FC = () => {
             <div className="flex items-center gap-4 flex-1 justify-end">
               {isAuthenticated ? (
                 <>
-                  <Button variant="ghost" size="icon">
-                    <Heart className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link to="/likes">
+                      <Heart className="h-5 w-5" />
+                    </Link>
                   </Button>
                   <Button variant="ghost" size="icon" asChild>
                     <Link to="/cart">
@@ -94,7 +96,6 @@ const Navbar: React.FC = () => {
             <Link to="/shirts" className="hover:text-gray-600">Shirts</Link>
             <Link to="/hoodies" className="hover:text-gray-600">Hoodies</Link>
             <Link to="/truckers" className="hover:text-gray-600">Truckers</Link>
-            <Link to="/likes" className="hover:text-gray-600">Favorites</Link>
             <Link to="/contact" className="hover:text-gray-600">Contact</Link>
           </div>
         </div>
@@ -106,7 +107,6 @@ const Navbar: React.FC = () => {
               <Link to="/shirts" className="text-sm font-medium py-2 border-b">SHIRTS</Link>
               <Link to="/hoodies" className="text-sm font-medium py-2 border-b">HOODIES</Link>
               <Link to="/truckers" className="text-sm font-medium py-2 border-b">TRUCKERS</Link>
-              <Link to="/likes" className="text-sm font-medium py-2 border-b">FAVORITES</Link>
               <Link to="/contact" className="text-sm font-medium py-2 border-b">CONTACT</Link>
               
               {isAuthenticated ? (
@@ -137,10 +137,6 @@ const Navbar: React.FC = () => {
           <Link to="/shirts" className="flex flex-col items-center">
             <Search className="h-5 w-5" />
             <span className="text-xs mt-1">Browse</span>
-          </Link>
-          <Link to="/likes" className="flex flex-col items-center">
-            <Heart className="h-5 w-5" />
-            <span className="text-xs mt-1">Favorites</span>
           </Link>
           <Link to="/cart" className="flex flex-col items-center">
             <ShoppingBag className="h-5 w-5" />

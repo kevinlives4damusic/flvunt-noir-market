@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 
 const Signup = () => {
   const { register, handleSubmit, formState: { errors }, watch } = useForm();
+  const navigate = useNavigate();
 
   const onSubmit = async (data: any) => {
     const { error } = await supabase.auth.signUp({
@@ -32,11 +33,25 @@ const Signup = () => {
         variant: "destructive"
       });
     } else {
-      toast({
-        title: "Account created",
-        description: "Please check your email for verification instructions.",
-        variant: "default"
+      // Auto-login without OTP
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password
       });
+      if (loginError) {
+        toast({
+          title: "Login failed",
+          description: loginError.message,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Welcome!",
+          description: "You are now logged in.",
+          variant: "default"
+        });
+        navigate('/?section=new-arrivals');
+      }
     }
   };
 
