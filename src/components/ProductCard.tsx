@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import ProductQuickView from './ProductQuickView';
+import LikeButton from './LikeButton';
 
 interface ProductCardProps {
   id: string;
@@ -109,15 +110,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           </div>
 
-          {/* Wishlist button */}
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="absolute top-2 right-2 bg-white hover:bg-flvunt-black hover:text-white rounded-full h-8 w-8"
-            onClick={handleWishlist}
-          >
-            <Heart className="h-4 w-4" />
-          </Button>
+          {/* Like button */}
+          <div className="absolute top-2 right-2">
+            <LikeButton productId={id} />
+          </div>
 
           {/* Labels */}
           {isNew && (

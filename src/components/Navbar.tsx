@@ -91,9 +91,11 @@ const Navbar: React.FC = () => {
           
           {/* Simplified Categories Menu */}
           <div className="hidden md:flex justify-center space-x-12 mt-4 border-b border-t py-3 border-flvunt-grey/30">
-            <Link to="/shirts" className="text-sm font-medium hover:text-gray-500">SHIRTS</Link>
-            <Link to="/hoodies" className="text-sm font-medium hover:text-gray-500">HOODIES</Link>
-            <Link to="/truckers" className="text-sm font-medium hover:text-gray-500">TRUCKERS</Link>
+            <Link to="/shirts" className="hover:text-gray-600">Shirts</Link>
+            <Link to="/hoodies" className="hover:text-gray-600">Hoodies</Link>
+            <Link to="/truckers" className="hover:text-gray-600">Truckers</Link>
+            <Link to="/likes" className="hover:text-gray-600">Favorites</Link>
+            <Link to="/contact" className="hover:text-gray-600">Contact</Link>
           </div>
         </div>
 
@@ -104,6 +106,8 @@ const Navbar: React.FC = () => {
               <Link to="/shirts" className="text-sm font-medium py-2 border-b">SHIRTS</Link>
               <Link to="/hoodies" className="text-sm font-medium py-2 border-b">HOODIES</Link>
               <Link to="/truckers" className="text-sm font-medium py-2 border-b">TRUCKERS</Link>
+              <Link to="/likes" className="text-sm font-medium py-2 border-b">FAVORITES</Link>
+              <Link to="/contact" className="text-sm font-medium py-2 border-b">CONTACT</Link>
               
               {isAuthenticated ? (
                 <Button onClick={logout} variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2">
@@ -133,6 +137,10 @@ const Navbar: React.FC = () => {
           <Link to="/shirts" className="flex flex-col items-center">
             <Search className="h-5 w-5" />
             <span className="text-xs mt-1">Browse</span>
+          </Link>
+          <Link to="/likes" className="flex flex-col items-center">
+            <Heart className="h-5 w-5" />
+            <span className="text-xs mt-1">Favorites</span>
           </Link>
           <Link to="/cart" className="flex flex-col items-center">
             <ShoppingBag className="h-5 w-5" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
 import { useProducts } from '@/hooks/useProducts';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,15 +6,34 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const FeaturedProducts: React.FC = () => {
-  const { data: products, isLoading } = useProducts("shirts");
+  const featuredProducts = [
+    {
+      id: '4',
+      name: 'FLVUNT Graphic T-Shirt "Eagle"',
+      price: 500,
+      description: "Premium quality apparel by FLVUNT",
+      image_url: '/images/shirts/image4.jpg'
+    },
+    {
+      id: '1',
+      name: 'Graphic T-Shirt "Spray Tag"',
+      price: 800,
+      description: "Premium quality apparel by FLVUNT",
+      image_url: '/images/shirts/image1.jpg'
+    },
+    {
+      id: '10',
+      name: 'FLVUNT Graphic T-Shirt',
+      price: 450,
+      description: "Premium quality apparel by FLVUNT",
+      image_url: '/images/shirts/image10.jpg'
+    }
+  ];
   const [scrollPosition, setScrollPosition] = useState(0);
   const [maxScroll, setMaxScroll] = useState(0);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  // Only show first 3 products for new arrivals
-  const newArrivals = products?.slice(0, 3);
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (scrollRef.current) {
       setMaxScroll(scrollRef.current.scrollWidth - scrollRef.current.clientWidth);
     }
@@ -27,7 +46,7 @@ const FeaturedProducts: React.FC = () => {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [products]);
+  }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -45,26 +64,13 @@ const FeaturedProducts: React.FC = () => {
     }
   };
 
-  const renderProductSkeleton = () => (
-    <>
-      {[...Array(3)].map((_, idx) => (
-        <div key={idx} className="flex flex-col gap-2 min-w-[250px] md:min-w-[300px]">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-6 w-full" />
-          <Skeleton className="h-4 w-16" />
-        </div>
-      ))}
-    </>
-  );
-
   return (
     <section className="py-16 relative">
       <div className="flvunt-container">
         <div className="flex justify-between items-end mb-8">
           <div>
             <h2 className="text-3xl font-light">New Arrivals</h2>
-            <p className="text-sm text-gray-600 mt-1">Discover our latest collection</p>
+            <p className="text-sm text-gray-600 mt-1">VETEMENTS PAR FLVUNT®</p>
           </div>
           <div className="hidden md:flex items-center gap-2">
             <Button 
@@ -92,24 +98,22 @@ const FeaturedProducts: React.FC = () => {
           ref={scrollRef}
           className="flex space-x-6 overflow-x-auto hide-scrollbar scroll-smooth pb-6"
         >
-          {isLoading ? renderProductSkeleton() : (
-            newArrivals?.map((product, index) => (
-              <div 
-                key={product.id} 
-                className="min-w-[250px] md:min-w-[300px]"
-              >
-                <ProductCard 
-                  id={product.id}
-                  name={product.name}
-                  designer="FLVUNT BASICS"
-                  price={`R ${product.price.toFixed(2)}`}
-                  imageUrl={`/images/shirts/image${index + 1}.jpg`}
-                  isNew={true}
-                  description={product.description}
-                />
-              </div>
-            ))
-          )}
+          {featuredProducts.map((product) => (
+            <div 
+              key={product.id} 
+              className="min-w-[250px] md:min-w-[300px]"
+            >
+              <ProductCard 
+                id={product.id}
+                name={product.name}
+                designer="VETEMENTS PAR FLVUNT®"
+                price={`R ${product.price.toFixed(2)}`}
+                imageUrl={product.image_url}
+                isNew={true}
+                description={product.description}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </section>

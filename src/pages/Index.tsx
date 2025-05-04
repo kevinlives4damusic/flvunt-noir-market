@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import '@/styles/fonts.css';
 import { useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
@@ -23,17 +24,20 @@ const Index = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-grow">
-        <HeroSection />
         <div ref={newArrivalsRef}>
           <FeaturedProducts />
         </div>
+        <HeroSection />
         <div className="py-16 flvunt-container text-center">
-          <h2 className="text-3xl font-light mb-6">Authentic Streetwear</h2>
+          <h2 className="text-3xl font-bold mb-6 spray-font">
+            flvunt apparel - Go againts normal
+          </h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            FLVUNT offers bold streetwear pieces that define urban culture.
-            Our designs emphasize authentic expression, premium quality, and street-inspired
-            aesthetics that stand out in the crowd.
+            Pretoria, South Africa 🇿🇦
           </p>
+          <a href="https://wa.me/c/27682073121" className="text-gray-600 hover:text-black mt-4 inline-block">
+            Contact Us
+          </a>
         </div>
         <Newsletter />
       </main>

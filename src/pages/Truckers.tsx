@@ -13,18 +13,14 @@ const Truckers = () => {
       <div className="flex-grow py-12 flvunt-container">
         <h1 className="text-3xl font-light tracking-wider mb-8">TRUCKERS</h1>
         
-        {isLoading ? (
-          <p className="text-gray-500 text-center py-10">Loading products...</p>
-        ) : products && products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Products would render here if there were any */}
+        <div className="text-center py-20 bg-gray-50 rounded-lg">
+          <h2 className="text-4xl font-bold mb-4">COMING SOON</h2>
+          <p className="text-xl text-gray-600 mb-6">Our Exclusive Trucker Collection</p>
+          <div className="space-y-2">
+            <p className="text-gray-500">Get ready for the ultimate street style statement</p>
+            <p className="text-gray-500">Launching Summer 2025</p>
           </div>
-        ) : (
-          <div className="text-center py-16">
-            <p className="text-xl text-gray-500 mb-2">No trucker hats available</p>
-            <p className="text-gray-400">Check back soon for our new trucker hat collection</p>
-          </div>
-        )}
+        </div>
       </div>
       <Footer />
     </div>

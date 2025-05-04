@@ -4,12 +4,17 @@ import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 
 const Hoodies = () => {
-  // Mock data for 4 hoodies
+  // Hoodie data with specific prices
+  const getHoodiePrice = (index: number): number => {
+    if (index < 3) return 900; // image1-3
+    return 450; // image4
+  };
+
   const hoodies = Array.from({ length: 4 }, (_, i) => ({
     id: String(i + 1),
-    name: `FLVUNT Essential Hoodie ${i + 1}`,
-    price: 599.99,
-    description: "Premium quality street style hoodie with modern design.",
+    name: `VETEMENTS PAR FLVUNT® HOODIE`,
+    price: getHoodiePrice(i),
+    description: "Premium quality apparel by FLVUNT",
     image_url: `/images/hoodies/image${i + 1}.jpg`
   }));
 

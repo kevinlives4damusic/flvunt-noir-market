@@ -16,6 +16,8 @@ import Shirts from "./pages/Shirts";
 import Truckers from "./pages/Truckers";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancel from "./pages/PaymentCancel";
+import Contact from "./pages/Contact";
+import Likes from "./pages/Likes";
 import CartProvider from "./context/CartContext";
 import { useState } from 'react'
 import './App.css'
@@ -51,6 +53,8 @@ const App = () => {
                 <Route path="/hoodies" element={<Hoodies />} />
                 <Route path="/shirts" element={<Shirts />} />
                 <Route path="/truckers" element={<Truckers />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/likes" element={<Likes />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </CartProvider>
