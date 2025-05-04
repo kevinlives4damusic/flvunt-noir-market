@@ -1,50 +1,28 @@
 import axios from 'axios';
-import * as dotenv from 'dotenv';
-import crypto from 'crypto';
+import { createCheckout } from './api';
 
-// Use import.meta.env for Vite client-side env vars, process.env for server-side
-const isServer = typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
-
-if (isServer) {
-  dotenv.config();
-}
-
-const yocoSecretKey = isServer ? process.env.YOCO_SECRET_KEY : import.meta.env.VITE_YOCO_SECRET_KEY;
-const yocoPublicKey = isServer ? process.env.YOCO_PUBLIC_KEY : import.meta.env.VITE_YOCO_PUBLIC_KEY;
-
-// Correct Base URL from Yoco Documentation
-const yocoApiBaseUrl = 'https://payments.yoco.com/api';
-
-if (!yocoSecretKey && isServer) {
-  throw new Error('Yoco Secret Key (YOCO_SECRET_KEY) is not defined in environment variables.');
-}
+// In the browser context, we only need the public key
+const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY;
 
 if (!yocoPublicKey) {
   console.warn('Yoco Public Key is not defined in environment variables.');
 }
 
-// Create an axios instance pre-configured for Yoco API calls
-const yocoApiClient = axios.create({
-  baseURL: yocoApiBaseUrl,
-  headers: {
-    'Authorization': `Bearer ${yocoSecretKey}`,
-    'Content-Type': 'application/json',
-  },
-  timeout: 15000,
-});
-
 interface YocoCheckoutResponse {
   success: boolean;
   data?: {
-    checkoutId: string;
-    redirectUrl: string;
+    checkoutId?: string;
+    redirectUrl?: string;
   };
   error?: {
     message: string;
   };
 }
 
-export const createYocoCheckout = async (
+/**
+ * Client-side function to initiate Yoco checkout through our serverless function
+ */
+export const initiateYocoCheckout = async (
   amountInCents: number,
   currency: string = 'ZAR',
   successUrl?: string,
@@ -52,13 +30,7 @@ export const createYocoCheckout = async (
   failureUrl?: string,
   metadata?: Record<string, any>
 ): Promise<YocoCheckoutResponse> => {
-  if (!isServer) {
-    return {
-      success: false,
-      error: { message: 'createYocoCheckout must be called from the server' }
-    };
-  }
-
+  // Validate minimum amount for ZAR
   if (currency === 'ZAR' && amountInCents < 200) {
     return {
       success: false,
@@ -66,56 +38,48 @@ export const createYocoCheckout = async (
     };
   }
 
-  const payload = {
-    amount: amountInCents,
-    currency,
-    ...(successUrl && { successUrl }),
-    ...(cancelUrl && { cancelUrl }),
-    ...(failureUrl && { failureUrl }),
-    ...(metadata && { metadata })
-  };
-
   try {
-    const response = await yocoApiClient.post('/checkouts', payload);
+    // Call our serverless function via the API client
+    const result = await createCheckout(
+      amountInCents,
+      currency,
+      successUrl,
+      cancelUrl,
+      failureUrl,
+      metadata
+    );
 
-    if (response.data && response.data.id && response.data.redirectUrl) {
-      return {
-        success: true,
-        data: {
-          checkoutId: response.data.id,
-          redirectUrl: response.data.redirectUrl,
-        },
+    if (!result.success) {
+      return { 
+        success: false, 
+        error: { 
+          message: typeof result.error === 'string' 
+            ? result.error 
+            : 'Failed to create checkout' 
+        } 
       };
     }
-    
-    throw new Error('Invalid response structure from Yoco Checkout API');
-  } catch (error) {
-    let errorMsg = 'Unknown Yoco API error';
-    if (axios.isAxiosError(error)) {
-      errorMsg = error.response?.data?.message || error.message;
-      console.error('Yoco Checkout API Error:', error.response?.status, error.response?.data || error.message);
-    } else if (error instanceof Error) {
-      errorMsg = error.message;
-      console.error('Yoco Checkout Non-API Error:', errorMsg);
-    }
 
-    return { success: false, error: { message: errorMsg } };
+    return {
+      success: true,
+      data: {
+        redirectUrl: result.data.redirectUrl
+      }
+    };
+  } catch (error) {
+    console.error('Error initiating Yoco checkout:', error);
+    return { 
+      success: false, 
+      error: { 
+        message: error instanceof Error ? error.message : 'Unknown error occurred' 
+      } 
+    };
   }
 };
 
+/**
+ * Get the Yoco public key for client-side operations
+ */
 export const getYocoPublicKey = () => yocoPublicKey;
 
-export const verifyYocoWebhookSignature = (signature: string, payload: string): boolean => {
-  if (!yocoSecretKey) {
-    console.error('Cannot verify webhook: YOCO_SECRET_KEY missing.');
-    return false;
-  }
-  
-  try {
-    const expected = crypto.createHmac('sha1', yocoSecretKey).update(payload).digest('hex');
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch (error) {
-    console.error('Error verifying Yoco webhook signature:', error);
-    return false;
-  }
-};
+// Note: The webhook signature verification is now handled in the serverless function
