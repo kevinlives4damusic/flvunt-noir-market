@@ -1,6 +1,7 @@
+
 import React, { useState, useContext } from 'react';
 import { Button } from '@/components/ui/button';
-import { User, Heart, ShoppingBag, Menu, X, Home, Search, LogOut } from 'lucide-react';
+import { User, Heart, ShoppingBag, Menu, X, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { CartContext } from '@/context/CartContext';
 import {
@@ -27,7 +28,7 @@ const Navbar: React.FC = () => {
         <div className="flvunt-container py-4">
           <div className="flex justify-between items-center">
             {/* Mobile menu button */}
-            <div className="block md:hidden">
+            <div className="md:flex-1 block md:hidden">
               <Button variant="ghost" size="icon" onClick={toggleMobileMenu}>
                 {mobileMenuOpen ? <X /> : <Menu />}
               </Button>
@@ -46,7 +47,7 @@ const Navbar: React.FC = () => {
                     <DropdownMenuLabel>{userEmail}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
+                      <User className="mr-2 h-4 w-4" />
                       <span>Log out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -61,13 +62,13 @@ const Navbar: React.FC = () => {
               )}
             </div>
 
-            {/* Logo */}
-            <div className="flex-1 md:flex-none text-center">
+            {/* Logo - Centered for mobile, left-aligned for desktop */}
+            <div className="flex-1 text-center">
               <Link to="/" className="text-2xl font-bold tracking-wider font-['Bebas_Neue',_sans-serif] text-3xl md:text-4xl">FLVUNT</Link>
             </div>
 
             {/* Icons */}
-            <div className="flex items-center gap-4 flex-1 justify-end">
+            <div className="md:flex-1 flex items-center gap-4 justify-end">
               {isAuthenticated ? (
                 <>
                   <Button variant="ghost" size="icon" asChild>
@@ -111,7 +112,7 @@ const Navbar: React.FC = () => {
               
               {isAuthenticated ? (
                 <Button onClick={logout} variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2">
-                  <LogOut className="h-4 w-4" />
+                  <User className="h-4 w-4" />
                   <span>Log out</span>
                 </Button>
               ) : (
@@ -127,32 +128,21 @@ const Navbar: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile Bottom Navigation with frosted glass effect */}
+      {/* Mobile Bottom Navigation with frosted glass effect - SIMPLIFIED */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md bg-white/70 border-t border-gray-200/50 shadow-t-sm">
         <div className="flex justify-around items-center py-3">
           <Link to="/" className="flex flex-col items-center">
             <Home className="h-5 w-5" />
             <span className="text-xs mt-1">Home</span>
           </Link>
-          <Link to="/shirts" className="flex flex-col items-center">
-            <Search className="h-5 w-5" />
-            <span className="text-xs mt-1">Browse</span>
-          </Link>
           <Link to="/cart" className="flex flex-col items-center">
             <ShoppingBag className="h-5 w-5" />
             <span className="text-xs mt-1">Cart</span>
           </Link>
-          {isAuthenticated ? (
-            <button onClick={logout} className="flex flex-col items-center">
-              <LogOut className="h-5 w-5" />
-              <span className="text-xs mt-1">Logout</span>
-            </button>
-          ) : (
-            <Link to="/login" className="flex flex-col items-center">
-              <User className="h-5 w-5" />
-              <span className="text-xs mt-1">Account</span>
-            </Link>
-          )}
+          <Link to="/account" className="flex flex-col items-center">
+            <User className="h-5 w-5" />
+            <span className="text-xs mt-1">Account</span>
+          </Link>
         </div>
       </div>
 
