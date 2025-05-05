@@ -1,9 +1,10 @@
+
 import axios from 'axios';
 import { createCheckout } from './api';
 import { supabase } from './supabase';
 import { PaymentErrorCode, createPaymentError, PaymentError } from './payment-errors';
 
-const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY;
+const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY || '';
 
 if (!yocoPublicKey) {
   console.warn('Yoco Public Key is not defined in environment variables.');
