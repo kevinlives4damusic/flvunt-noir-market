@@ -4,7 +4,8 @@ import { createCheckout } from './api';
 import { supabase } from './supabase';
 import { PaymentErrorCode, createPaymentError, PaymentError } from './payment-errors';
 
-const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY || '';
+// Get Yoco public key from environment variables
+const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY || 'pk_test_076a52e0R4velyDbbd24';
 
 if (!yocoPublicKey) {
   console.warn('Yoco Public Key is not defined in environment variables.');
@@ -85,6 +86,8 @@ export const initiateYocoCheckout = async (
       environment: import.meta.env.MODE || 'development'
     };
 
+    console.log('Initiating Yoco checkout with amount:', amountInCents, currency);
+
     // Call our serverless function via the API client
     const result = await createCheckout(
       amountInCents,
@@ -96,6 +99,7 @@ export const initiateYocoCheckout = async (
     );
 
     if (!result.success) {
+      console.error('Checkout creation failed:', result.error);
       return {
         success: false,
         error: createPaymentError(
@@ -105,6 +109,11 @@ export const initiateYocoCheckout = async (
         )
       };
     }
+
+    console.log('Yoco checkout created successfully:', {
+      checkoutId: result.data.checkoutId,
+      hasRedirectUrl: !!result.data.redirectUrl
+    });
 
     return {
       success: true,

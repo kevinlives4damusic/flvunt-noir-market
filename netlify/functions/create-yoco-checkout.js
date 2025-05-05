@@ -1,10 +1,11 @@
+
 import axios from 'axios';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
 const YOCO_API_URL = 'https://online.yoco.com/v1/checkout/';
-const YOCO_SECRET_KEY = process.env.YOCO_SECRET_KEY;
+const YOCO_SECRET_KEY = process.env.YOCO_SECRET_KEY || 'sk_test_73ff60ff3mgAG1b03714801a36a5';
 
 if (!YOCO_SECRET_KEY) {
   throw new Error('YOCO_SECRET_KEY is not set in environment variables');
@@ -55,6 +56,16 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Creating Yoco checkout with params:', {
+      amount: amountInCents,
+      currency,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      failure_url: failureUrl,
+      // Not logging full metadata for security
+      metadata_present: !!metadata
+    });
+
     // Create checkout session with Yoco
     const response = await axios.post(
       YOCO_API_URL,
@@ -73,6 +84,11 @@ exports.handler = async (event, context) => {
         }
       }
     );
+
+    console.log('Yoco checkout created successfully:', {
+      id: response.data.id,
+      hasUrl: !!response.data.url
+    });
 
     return {
       statusCode: 200,

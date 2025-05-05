@@ -1,9 +1,8 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, CreditCard, Shield } from 'lucide-react';
+import { ArrowLeft, Check, CreditCard, Shield, Lock } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { CartContext } from '@/context/CartContext';
@@ -319,6 +318,18 @@ const Payment = () => {
                 />
               </div>
               
+              <div className="flex items-center justify-center mt-6">
+                <img 
+                  src="/images/yoco-logo.svg" 
+                  alt="Yoco Payment Provider" 
+                  className="h-10" 
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://cdn.yoco.co.za/images/za/logos/yoco-logo.svg';
+                  }}
+                />
+              </div>
+              
               {/* Save card information checkbox */}
               <div className="mt-6 flex items-center space-x-2">
                 <input
@@ -334,7 +345,7 @@ const Payment = () => {
               </div>
               
               {paymentMethod === 'yoco' && (
-                <div className="space-y-4 animate-fade-in">
+                <div className="space-y-4 animate-fade-in mt-6">
                   {/* Credit Card Input Fields */}
                   <div className="space-y-4">
                     <div>
@@ -391,7 +402,7 @@ const Payment = () => {
                   </div>
                   
                   <button 
-                    className="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition-colors"
+                    className="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition-colors flex items-center justify-center"
                     onClick={handlePayment}
                     disabled={processing}
                   >
@@ -404,7 +415,10 @@ const Payment = () => {
                         Processing...
                       </span>
                     ) : (
-                      'Pay R ' + total.toFixed(2)
+                      <>
+                        <Lock className="mr-2 h-4 w-4" />
+                        Pay R {total.toFixed(2)}
+                      </>
                     )}
                   </button>
                 </div>
@@ -419,16 +433,10 @@ const Payment = () => {
                 {/* Payment method logos */}
                 <div className="mt-4 text-center border-t pt-4 w-full">
                   <p className="text-sm text-gray-500 mb-2">We accept</p>
-                  <div className="flex justify-center items-center">
-                    <img 
-                      src="/images/Screenshot-2025-05-04-195325.svg" 
-                      alt="Accepted payment methods" 
-                      className="h-16 mx-auto" 
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.outerHTML = '<div className="flex gap-2 justify-center"><span className="text-sm font-medium">Visa</span><span className="text-sm font-medium">Mastercard</span><span className="text-sm font-medium">American Express</span></div>';
-                      }}
-                    />
+                  <div className="flex justify-center gap-3 items-center">
+                    <span className="font-medium text-sm">Visa</span>
+                    <span className="font-medium text-sm">Mastercard</span>
+                    <span className="font-medium text-sm">American Express</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Your card details are securely processed and protected by 256-bit encryption

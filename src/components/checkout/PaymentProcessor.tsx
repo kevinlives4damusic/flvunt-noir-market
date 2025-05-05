@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Lock } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createPayment } from '@/lib/payment-service';
 import { handlePaymentError } from '@/lib/payment-errors';
@@ -34,9 +35,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
 
   // Get the current URL for success/cancel/failure redirects
   const baseUrl = window.location.origin;
-  const successUrl = `${baseUrl}/checkout/success?orderId=${orderId}`;
-  const cancelUrl = `${baseUrl}/checkout/cancel?orderId=${orderId}`;
-  const failureUrl = `${baseUrl}/checkout/failure?orderId=${orderId}`;
+  const successUrl = `${baseUrl}/payment-success?orderId=${orderId}`;
+  const cancelUrl = `${baseUrl}/payment-cancel?orderId=${orderId}`;
+  const failureUrl = `${baseUrl}/payment-failure?orderId=${orderId}`;
 
   const handlePaymentInitiation = async () => {
     setIsLoading(true);
@@ -72,6 +73,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         setError(errorMessage);
         if (onError) onError(errorMessage);
       } else {
+        console.log('Payment initiated, redirecting to:', result.redirectUrl);
         // Redirect to Yoco checkout
         window.location.href = result.redirectUrl;
       }
@@ -127,6 +129,10 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                 src="/images/yoco-logo.svg" 
                 alt="Yoco Secure Payments" 
                 className="h-8"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://cdn.yoco.co.za/images/za/logos/yoco-logo.svg';
+                }}
               />
             </div>
           </div>
@@ -135,7 +141,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       <CardFooter className="flex flex-col space-y-2">
         <Button 
-          className="w-full" 
+          className="w-full bg-black hover:bg-gray-800" 
           onClick={handlePaymentInitiation}
           disabled={isLoading}
         >
@@ -145,7 +151,10 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               Processing...
             </>
           ) : (
-            `Pay ${currency} ${(amount / 100).toFixed(2)}`
+            <>
+              <Lock className="mr-2 h-4 w-4" />
+              Pay {currency} {(amount / 100).toFixed(2)}
+            </>
           )}
         </Button>
         
@@ -160,6 +169,11 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         >
           Cancel
         </Button>
+        
+        <div className="mt-2 flex items-center justify-center text-xs text-gray-500">
+          <Lock className="h-3 w-3 mr-1" /> 
+          Payments secured by 256-bit encryption
+        </div>
       </CardFooter>
     </Card>
   );
