@@ -1,0 +1,35 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+[dev]
+  command = "npm run dev"
+  port = 8080
+  targetPort = 5173
+  publish = "dist"
+
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Handle client-side routing
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Ensure that non-API routes are handled by the SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
