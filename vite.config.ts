@@ -2,6 +2,7 @@
 import path from "path"
 import { defineConfig, loadEnv } from "vite"
 import react from "@vitejs/plugin-react-swc"
+import { componentTagger } from "lovable-tagger"
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,7 +14,10 @@ export default defineConfig(({ mode }) => {
   const repoName = process.env.REPOSITORY_NAME || 'flvunt-noir-market'
   
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      mode === 'development' && componentTagger(),
+    ].filter(Boolean),
     // Base path for GitHub Pages: /<repository-name>/
     base: process.env.NODE_ENV === 'production' ? `/${repoName}/` : '/',
     resolve: {
@@ -22,6 +26,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: "::",
       port: 8080,
       proxy: {
         '/api': {
