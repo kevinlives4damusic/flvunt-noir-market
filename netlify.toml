@@ -7,11 +7,20 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
 
-[dev]
-  command = "npm run dev"
-  port = 8080
-  targetPort = 5173
-  publish = "dist"
+[[headers]]
+  for = "/*.js"
+    [headers.values]
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/*.mjs"
+    [headers.values]
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/assets/*"
+    [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
 
 [[headers]]
   for = "/*"
@@ -19,15 +28,14 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization"
-    Cache-Control = "public, max-age=0, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
+    X-Content-Type-Options = "nosniff"
 
-# Handle client-side routing
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# Ensure that non-API routes are handled by the SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
