@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -13,7 +13,7 @@ const Products = () => {
   const category = searchParams.get('category') || '';
   const sortBy = searchParams.get('sort') || 'newest';
   
-  const { products, loading, error } = useProductsWithFilters(category, sortBy);
+  const { data: products = [], isLoading, error } = useProductsWithFilters(category, sortBy);
 
   const handleCategoryChange = (newCategory: string) => {
     if (newCategory === 'all') {
@@ -42,7 +42,7 @@ const Products = () => {
           onSortChange={handleSortChange}
         />
         
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-black"></div>
           </div>
