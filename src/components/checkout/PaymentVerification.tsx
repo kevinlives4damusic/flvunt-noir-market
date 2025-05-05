@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, AlertCircle, CheckCircle, ShoppingBag } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { verifyPayment, getPaymentsByOrderId } from '@/lib/payment-service';
+import { verifyPayment, getPaymentsByOrderId, updateOrderAfterSuccessfulPayment } from '@/lib/payment-service';
 import { handlePaymentError } from '@/lib/payment-errors';
 
 interface PaymentVerificationProps {
@@ -21,6 +21,8 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('orderId');
   const paymentId = searchParams.get('paymentId');
+  const checkoutId = searchParams.get('id'); // Yoco sometimes returns this
+  const status = searchParams.get('status'); // Yoco sometimes returns this
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,8 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
       }
 
       try {
+        console.log('Verifying payment with params:', { orderId, paymentId, checkoutId, status });
+        
         // If we have a specific payment ID, verify that payment
         if (paymentId) {
           const result = await verifyPayment(paymentId);
@@ -46,16 +50,44 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
             setError(errorMessage);
             if (onError) onError(errorMessage);
           } else {
+            // Ensure order is updated to paid
+            if (result.payment?.status === 'succeeded') {
+              await updateOrderAfterSuccessfulPayment(orderId, paymentId);
+            }
             setSuccess(true);
             if (onSuccess) onSuccess(paymentId);
           }
-        } else {
-          // Otherwise, get all payments for this order and check for a successful one
+        } 
+        // Check if we have status from Yoco redirect
+        else if (status === 'complete' && checkoutId) {
+          // Find payment by checkout ID from our payments table
+          const payments = await getPaymentsByOrderId(orderId);
+          const payment = payments.find(p => p.checkoutId === checkoutId);
+          
+          if (payment) {
+            // Update order if payment was successful and not already done
+            if (payment.status === 'succeeded') {
+              await updateOrderAfterSuccessfulPayment(orderId, payment.id);
+              setSuccess(true);
+              if (onSuccess) onSuccess(payment.id);
+            } else {
+              setError('Payment is still processing. Please check your order status later.');
+              if (onError) onError('Payment still processing');
+            }
+          } else {
+            setError('Payment information not found. Please contact customer support.');
+            if (onError) onError('Payment not found');
+          }
+        }
+        // Otherwise, get all payments for this order and check for a successful one
+        else {
           const payments = await getPaymentsByOrderId(orderId);
           
           const successfulPayment = payments.find(p => p.status === 'succeeded');
           
           if (successfulPayment) {
+            // Ensure order is updated to paid
+            await updateOrderAfterSuccessfulPayment(orderId, successfulPayment.id);
             setSuccess(true);
             if (onSuccess) onSuccess(successfulPayment.id);
           } else if (payments.length > 0) {
@@ -85,7 +117,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
     };
 
     verifyPaymentStatus();
-  }, [orderId, paymentId, onSuccess, onError]);
+  }, [orderId, paymentId, checkoutId, status, onSuccess, onError]);
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -129,10 +161,10 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
         {success && (
           <Button 
             className="w-full" 
-            onClick={() => navigate(redirectPath)}
+            onClick={() => navigate('/payment-success?orderId=' + orderId)}
           >
             <ShoppingBag className="mr-2 h-4 w-4" />
-            View Your Orders
+            View Your Order
           </Button>
         )}
         

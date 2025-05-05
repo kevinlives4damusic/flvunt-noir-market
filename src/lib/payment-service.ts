@@ -1,5 +1,6 @@
+
 import { supabase } from './supabase';
-import { initiateYocoCheckout } from './yoco';
+import { initiateYocoCheckout, verifyYocoPayment } from './yoco';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
@@ -77,6 +78,14 @@ export const createPayment = async ({
       };
     }
     
+    // Add payment ID to metadata for reference in webhook
+    const enhancedMetadata = {
+      ...metadata,
+      paymentId: payment.id,
+      orderId,
+      idempotencyKey
+    };
+
     // Initiate Yoco checkout
     const checkoutResult = await initiateYocoCheckout(
       amountInCents,
@@ -84,13 +93,8 @@ export const createPayment = async ({
       successUrl,
       cancelUrl,
       failureUrl,
-      { 
-        ...metadata, 
-        paymentId: payment.id,
-        orderId,
-        idempotencyKey
-      },
-      saveCard // Pass the saveCard option
+      enhancedMetadata,
+      saveCard
     );
     
     if (!checkoutResult.success) {
@@ -99,7 +103,9 @@ export const createPayment = async ({
         .from('payments')
         .update({
           status: 'failed',
-          error_message: checkoutResult.error?.message,
+          error_message: typeof checkoutResult.error === 'string' 
+            ? checkoutResult.error 
+            : checkoutResult.error?.message,
           updated_at: new Date().toISOString()
         })
         .eq('id', payment.id);
@@ -109,8 +115,12 @@ export const createPayment = async ({
         payment: mapPaymentFromDb(payment),
         error: createPaymentError(
           PaymentErrorCode.CHECKOUT_FAILED,
-          checkoutResult.error?.message || 'Failed to create checkout',
-          checkoutResult.error?.detail,
+          typeof checkoutResult.error === 'string'
+            ? checkoutResult.error
+            : checkoutResult.error?.message || 'Failed to create checkout',
+          typeof checkoutResult.error === 'string'
+            ? undefined
+            : checkoutResult.error?.detail,
           checkoutResult.error
         )
       };
@@ -215,8 +225,25 @@ export const verifyPayment = async (paymentId: string): Promise<{ success: boole
       };
     }
     
-    // TODO: Implement Yoco payment verification API call here
-    // For now, we'll rely on webhooks to update the payment status
+    // For pending payments with a checkout ID, verify with Yoco
+    if (payment.checkoutId) {
+      const verificationResult = await verifyYocoPayment(payment.checkoutId);
+      if (verificationResult.success) {
+        // Payment verification was successful, get updated payment
+        const updatedPayment = await getPaymentById(payment.id);
+        return {
+          success: true,
+          payment: updatedPayment || payment
+        };
+      }
+      
+      // Payment verification failed but we already have the payment record
+      return {
+        success: false,
+        payment,
+        error: verificationResult.error
+      };
+    }
     
     return {
       success: payment.status === 'succeeded',

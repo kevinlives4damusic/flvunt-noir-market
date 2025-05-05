@@ -4,12 +4,9 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-const YOCO_API_URL = 'https://online.yoco.com/v1/checkout/';
+// Use the environment variable or default test key
 const YOCO_SECRET_KEY = process.env.YOCO_SECRET_KEY || 'sk_test_73ff60ff3mgAG1b03714801a36a5';
-
-if (!YOCO_SECRET_KEY) {
-  throw new Error('YOCO_SECRET_KEY is not set in environment variables');
-}
+const YOCO_API_URL = 'https://online.yoco.com/v1/checkout/';
 
 exports.handler = async (event, context) => {
   // Enable CORS
@@ -36,14 +33,16 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    const requestBody = JSON.parse(event.body);
     const { 
       amountInCents, 
       currency = 'ZAR',
       successUrl,
       cancelUrl,
       failureUrl,
-      metadata 
-    } = JSON.parse(event.body);
+      metadata,
+      saveCard = false
+    } = requestBody;
 
     // Validate required fields
     if (!amountInCents || amountInCents < 200) {
@@ -56,15 +55,11 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Creating Yoco checkout with params:', {
-      amount: amountInCents,
-      currency,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      failure_url: failureUrl,
-      // Not logging full metadata for security
-      metadata_present: !!metadata
-    });
+    console.log('Creating Yoco checkout for amount:', amountInCents, currency);
+
+    // Include idempotency key to prevent duplicate charges
+    const idempotencyKey = metadata?.idempotencyKey || 
+      `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
 
     // Create checkout session with Yoco
     const response = await axios.post(
@@ -75,12 +70,14 @@ exports.handler = async (event, context) => {
         success_url: successUrl,
         cancel_url: cancelUrl,
         failure_url: failureUrl,
-        metadata
+        metadata,
+        save_card: saveCard
       },
       {
         headers: {
           'Authorization': `Bearer ${YOCO_SECRET_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey
         }
       }
     );

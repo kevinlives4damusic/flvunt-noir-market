@@ -89,6 +89,62 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount_cents: number
+          checkout_id: string | null
+          checkout_url: string | null
+          created_at: string | null
+          currency: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          payment_provider: string
+          provider_payment_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_cents: number
+          checkout_id?: string | null
+          checkout_url?: string | null
+          created_at?: string | null
+          currency?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_provider?: string
+          provider_payment_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          checkout_id?: string | null
+          checkout_url?: string | null
+          created_at?: string | null
+          currency?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_provider?: string
+          provider_payment_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string
