@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,32 +14,49 @@ import { supabase } from '@/lib/supabase';
 const Login = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
   const onSubmit = async (data: any) => {
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email: data.email, 
-      password: data.password 
-    });
-    
-    if (error) {
-      toast.error('Error logging in', { description: error.message });
-    } else {
-      toast.success('Welcome back!');
-      // Redirect to home page and scroll to New Arrivals
-      navigate('/?section=new-arrivals');
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email: data.email, 
+        password: data.password 
+      });
+      
+      if (error) {
+        toast.error('Error logging in', { description: error.message });
+      } else {
+        toast.success('Welcome back!');
+        // Redirect to home page and scroll to New Arrivals
+        navigate('/?section=new-arrivals');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ 
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/?section=new-arrivals`
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ 
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/?section=new-arrivals`
+        }
+      });
+      
+      if (error) {
+        toast.error('Error logging in', { description: error.message });
       }
-    });
-    
-    if (error) {
-      toast.error('Error logging in', { description: error.message });
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,6 +84,7 @@ const Login = () => {
           <Button 
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-800 hover:bg-gray-50"
+            disabled={isLoading}
           >
             <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
               <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -103,6 +122,7 @@ const Login = () => {
                     }
                   })}
                   className="border-gray-300 focus:ring-black focus:border-black"
+                  disabled={isLoading}
                 />
                 {errors.email && (
                   <p className="mt-1 text-xs text-red-600">
@@ -127,6 +147,7 @@ const Login = () => {
                     }
                   })}
                   className="border-gray-300 focus:ring-black focus:border-black"
+                  disabled={isLoading}
                 />
                 {errors.password && (
                   <p className="mt-1 text-xs text-red-600">
@@ -150,7 +171,7 @@ const Login = () => {
               </div>
 
               <div className="text-sm">
-                <Link to="#" className="font-medium text-black hover:underline">
+                <Link to="/forgot-password" className="font-medium text-black hover:underline">
                   Forgot your password?
                 </Link>
               </div>
@@ -160,8 +181,9 @@ const Login = () => {
               <Button
                 type="submit"
                 className="flvunt-button w-full"
+                disabled={isLoading}
               >
-                LOG IN
+                {isLoading ? 'LOGGING IN...' : 'LOG IN'}
               </Button>
             </div>
           </form>

@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -42,6 +43,21 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setIsAuthenticated(!!session);
+        setUserEmail(session?.user?.email ?? null);
+        
+        if (session) {
+          localStorage.setItem('supabase_session', JSON.stringify(session));
+        } else {
+          localStorage.removeItem('supabase_session');
+        }
+      }
+    );
+
+    // THEN check for existing session
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -60,17 +76,6 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
     };
 
     initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      setUserEmail(session?.user?.email ?? null);
-      
-      if (session) {
-        localStorage.setItem('supabase_session', JSON.stringify(session));
-      } else {
-        localStorage.removeItem('supabase_session');
-      }
-    });
 
     return () => {
       subscription.unsubscribe();
@@ -127,16 +132,21 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
     // Save cart items before logout
     const cartItems = [...items];
     
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error('Error signing out');
-    } else {
-      // Restore cart items after logout instead of clearing them
-      setItems(cartItems);
-      // Update localStorage with the preserved cart
-      localStorage.setItem('cart', JSON.stringify(cartItems));
-      navigate('/');
-      toast.success('Logged out successfully');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error('Error signing out', { description: error.message });
+      } else {
+        // Restore cart items after logout instead of clearing them
+        setItems(cartItems);
+        // Update localStorage with the preserved cart
+        localStorage.setItem('cart', JSON.stringify(cartItems));
+        navigate('/');
+        toast.success('Logged out successfully');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('An error occurred while logging out');
     }
   };
 

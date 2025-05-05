@@ -1,9 +1,10 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -13,59 +14,63 @@ import { supabase } from '@/lib/supabase';
 const Signup = () => {
   const { register, handleSubmit, formState: { errors }, watch } = useForm();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
   const onSubmit = async (data: any) => {
-    const { error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          first_name: data.firstName,
-          last_name: data.lastName
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            first_name: data.firstName,
+            last_name: data.lastName
+          }
+        }
+      });
+
+      if (error) {
+        toast.error("Registration failed", { description: error.message });
+      } else {
+        // Auto-login without OTP
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password
+        });
+        if (loginError) {
+          toast.error("Login failed", { description: loginError.message });
+        } else {
+          toast.success("Welcome!", { description: "You are now logged in." });
+          navigate('/?section=new-arrivals');
         }
       }
-    });
-
-    if (error) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    } else {
-      // Auto-login without OTP
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
-      });
-      if (loginError) {
-        toast({
-          title: "Login failed",
-          description: loginError.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Welcome!",
-          description: "You are now logged in.",
-          variant: "default"
-        });
-        navigate('/?section=new-arrivals');
-      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGoogleSignup = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google'
-    });
-    
-    if (error) {
-      toast({
-        title: "Google signup failed",
-        description: error.message,
-        variant: "destructive"
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/?section=new-arrivals`
+        }
       });
+      
+      if (error) {
+        toast.error("Google signup failed", { description: error.message });
+      }
+    } catch (error) {
+      console.error('Google signup error:', error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -93,6 +98,7 @@ const Signup = () => {
           <Button 
             onClick={handleGoogleSignup}
             className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-800 hover:bg-gray-50"
+            disabled={isLoading}
           >
             <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
               <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -127,6 +133,7 @@ const Signup = () => {
                       required: "First name is required"
                     })}
                     className="w-full border-gray-300 focus:ring-black focus:border-black"
+                    disabled={isLoading}
                   />
                   {errors.firstName && (
                     <p className="mt-1 text-xs text-red-600">
@@ -146,6 +153,7 @@ const Signup = () => {
                       required: "Last name is required"
                     })}
                     className="w-full border-gray-300 focus:ring-black focus:border-black"
+                    disabled={isLoading}
                   />
                   {errors.lastName && (
                     <p className="mt-1 text-xs text-red-600">
@@ -171,6 +179,7 @@ const Signup = () => {
                     }
                   })}
                   className="border-gray-300 focus:ring-black focus:border-black"
+                  disabled={isLoading}
                 />
                 {errors.email && (
                   <p className="mt-1 text-xs text-red-600">
@@ -195,6 +204,7 @@ const Signup = () => {
                     }
                   })}
                   className="border-gray-300 focus:ring-black focus:border-black"
+                  disabled={isLoading}
                 />
                 {errors.password && (
                   <p className="mt-1 text-xs text-red-600">
@@ -217,6 +227,7 @@ const Signup = () => {
                       value === watch("password") || "Passwords don't match"
                   })}
                   className="border-gray-300 focus:ring-black focus:border-black"
+                  disabled={isLoading}
                 />
                 {errors.confirmPassword && (
                   <p className="mt-1 text-xs text-red-600">
@@ -235,6 +246,7 @@ const Signup = () => {
                 {...register("terms", { 
                   required: "You must accept the terms and privacy policy"
                 })}
+                disabled={isLoading}
               />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
                 I agree to the{" "}
@@ -257,8 +269,9 @@ const Signup = () => {
               <Button
                 type="submit"
                 className="flvunt-button w-full"
+                disabled={isLoading}
               >
-                SIGN UP
+                {isLoading ? 'SIGNING UP...' : 'SIGN UP'}
               </Button>
             </div>
           </form>
