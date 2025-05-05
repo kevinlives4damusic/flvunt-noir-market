@@ -1,0 +1,23 @@
+
+project_id = "vqcatlpsindjoosssqil"
+
+[api]
+# Port to use for the API URL
+port = 54321
+# Schemas to expose in your API
+schemas = ["public", "storage", "graphql_public"]
+# Extra schemas to add to the search_path of every request
+extra_search_path = ["public", "extensions"]
+# Max rows to return per page
+max_rows = 1000
+
+[db]
+# Port to use for the local database URL
+port = 54322
+# The database major version to use. This must be the same as your remote database's
+# major version.
+major_version = 15
+
+[functions]
+[functions.yoco-webhook]
+verify_jwt = false
