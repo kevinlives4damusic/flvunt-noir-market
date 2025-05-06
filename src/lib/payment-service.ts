@@ -241,7 +241,11 @@ export const verifyPayment = async (paymentId: string): Promise<{ success: boole
       return {
         success: false,
         payment,
-        error: verificationResult.error
+        error: verificationResult.error ? createPaymentError(
+          PaymentErrorCode.PAYMENT_VERIFICATION_FAILED,
+          verificationResult.error.message,
+          verificationResult.error.detail
+        ) : undefined
       };
     }
     
