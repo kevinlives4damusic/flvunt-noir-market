@@ -8,7 +8,7 @@ export type YocoResponse = {
     redirectUrl: string;
     checkoutId: string;
   };
-  error?: string | { message: string };
+  error?: string | { message: string; detail?: string };
 };
 
 export interface InitiatePaymentArgs {
@@ -27,7 +27,8 @@ export const initiateYocoCheckout = async (
   successUrl: string,
   cancelUrl: string,
   failureUrl: string,
-  metadata: Record<string, any> = {}
+  metadata: Record<string, any> = {},
+  saveCard: boolean = false // Optional parameter
 ): Promise<YocoResponse> => {
   console.log('Initiating Yoco checkout with amount:', amountInCents);
   
@@ -47,6 +48,7 @@ export const initiateYocoCheckout = async (
           cancelUrl,
           failureUrl,
           metadata,
+          saveCard, // Pass the saveCard option to the API
         }),
       }
     );
@@ -92,6 +94,64 @@ export const initiateYocoCheckout = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+};
+
+// Function to verify a Yoco payment status
+export const verifyYocoPayment = async (checkoutId: string): Promise<{
+  success: boolean;
+  status?: 'succeeded' | 'failed' | 'canceled' | 'processing';
+  error?: {
+    message: string;
+    detail?: string;
+  };
+}> => {
+  try {
+    console.log('Verifying Yoco payment with checkout ID:', checkoutId);
+    
+    const response = await fetchWithFallback(
+      '/api/verify-yoco-payment',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ checkoutId }),
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Yoco verification error response:', errorData);
+      let errorMessage = 'Payment verification failed';
+      
+      try {
+        const errorJson = JSON.parse(errorData);
+        errorMessage = errorJson.error || errorJson.message || errorMessage;
+      } catch (e) {
+        errorMessage = errorData || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log('Yoco payment verification result:', data);
+    
+    return {
+      success: data.status === 'succeeded',
+      status: data.status,
+      error: data.error ? { message: data.error } : undefined
+    };
+  } catch (error) {
+    console.error('Error verifying Yoco payment:', error);
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown verification error',
+        detail: 'An error occurred while verifying the payment status'
+      }
     };
   }
 };

@@ -120,7 +120,7 @@ export const createPayment = async ({
             : checkoutResult.error?.message || 'Failed to create checkout',
           typeof checkoutResult.error === 'string'
             ? undefined
-            : checkoutResult.error?.detail,
+            : checkoutResult.error?.message, // Removed .detail access
           checkoutResult.error
         )
       };
