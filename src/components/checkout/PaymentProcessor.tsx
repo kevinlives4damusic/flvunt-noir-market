@@ -35,9 +35,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
 
   // Get the current URL for success/cancel/failure redirects
   const baseUrl = window.location.origin;
-  const successUrl = `${baseUrl}/payment-success?orderId=${orderId}`;
-  const cancelUrl = `${baseUrl}/payment-cancel?orderId=${orderId}`;
-  const failureUrl = `${baseUrl}/payment-failure?orderId=${orderId}`;
+  const successUrl = `${baseUrl}/#/payment-success?orderId=${orderId}`;
+  const cancelUrl = `${baseUrl}/#/payment-cancel?orderId=${orderId}`;
+  const failureUrl = `${baseUrl}/#/payment-failure?orderId=${orderId}`;
 
   const handlePaymentInitiation = async () => {
     setIsLoading(true);
@@ -126,13 +126,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             
             <div className="flex items-center justify-center mt-4 bg-black p-3 rounded">
               <img 
-                src="/images/yoco-logo-white.svg" 
+                src="/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png" 
                 alt="Yoco Secure Payments" 
                 className="h-8"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png';
-                }}
               />
             </div>
           </div>

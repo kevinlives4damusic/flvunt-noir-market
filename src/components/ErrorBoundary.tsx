@@ -1,5 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
   children: ReactNode;
@@ -18,11 +19,18 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
+    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the error to console
     console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    
+    // Optionally show a toast for better user experience
+    toast.error("Something went wrong", {
+      description: error.message || "An unexpected error occurred"
+    });
   }
 
   render() {

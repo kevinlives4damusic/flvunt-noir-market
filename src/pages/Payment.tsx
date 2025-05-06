@@ -55,6 +55,7 @@ const Payment = () => {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [nameOnCard, setNameOnCard] = useState('');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Check if we're returning from a payment provider
   const isVerifying = searchParams.has('payment_id') || searchParams.has('status');
@@ -125,6 +126,7 @@ const Payment = () => {
   
   // Handle payment error
   const handlePaymentError = (error: string) => {
+    setPaymentError(error);
     toast.error(`Payment failed: ${error}`);
     setProcessing(false);
     if (orderId) {
@@ -197,6 +199,9 @@ const Payment = () => {
   const handlePayment = async () => {
     if (processing) return;
     
+    // Reset previous errors
+    setPaymentError(null);
+    
     // Basic validation
     if (!cardNumber || !expiryDate || !cvv || !nameOnCard) {
       toast.error('Please fill in all card details');
@@ -223,12 +228,14 @@ const Payment = () => {
       
       // Set up URLs for payment flow
       const baseUrl = window.location.origin;
-      const successUrl = `${baseUrl}/payment-success?orderId=${newOrderId}`;
-      const cancelUrl = `${baseUrl}/payment-cancel?orderId=${newOrderId}`;
-      const failureUrl = `${baseUrl}/payment-failure?orderId=${newOrderId}`;
+      const successUrl = `${baseUrl}/#/payment-success?orderId=${newOrderId}`;
+      const cancelUrl = `${baseUrl}/#/payment-cancel?orderId=${newOrderId}`;
+      const failureUrl = `${baseUrl}/#/payment-failure?orderId=${newOrderId}`;
       
       // Process the payment directly with Yoco
       try {
+        console.log('Setting up payment with base URL:', baseUrl);
+        
         // Create metadata with card and order details
         const metadata = {
           orderId: newOrderId,
@@ -252,10 +259,14 @@ const Payment = () => {
         );
         
         if (!result.success || !result.data?.redirectUrl) {
-          throw new Error(result.error ? 
-            (typeof result.error === 'string' ? result.error : result.error.message) : 
-            'Payment creation failed');
+          const errorMessage = typeof result.error === 'string' 
+            ? result.error 
+            : (result.error?.message || 'Payment creation failed');
+          
+          throw new Error(errorMessage);
         }
+        
+        console.log('Payment initiated successfully, redirecting to:', result.data.redirectUrl);
         
         // Redirect to the Yoco checkout page
         window.location.href = result.data.redirectUrl;
@@ -321,15 +332,19 @@ const Payment = () => {
               
               <div className="flex items-center justify-center mt-6 bg-black p-4 rounded">
                 <img 
-                  src="/images/yoco-logo-white.svg" 
+                  src="/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png" 
                   alt="Yoco Payment Provider" 
-                  className="h-10" 
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png';
-                  }}
+                  className="h-10"
                 />
               </div>
+              
+              {/* Display payment error if any */}
+              {paymentError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                  <p className="font-medium">Payment Error:</p>
+                  <p>{paymentError}</p>
+                </div>
+              )}
               
               {/* Save card information checkbox */}
               <div className="mt-6 flex items-center space-x-2">

@@ -1,3 +1,4 @@
+
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import * as dotenv from 'dotenv';
@@ -5,6 +6,8 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,11 +21,15 @@ const clientOrigin = process.env.CLIENT_BASE_URL || 'http://localhost:8080';
 
 // Validate required environment variables
 if (!process.env.YOCO_SECRET_KEY) {
-  console.error('Error: YOCO_SECRET_KEY is required but not set in environment variables');
-  process.exit(1);
+  console.error('Warning: YOCO_SECRET_KEY is not set in environment variables, using default test key');
 }
 
-app.use(cors({ origin: clientOrigin }));
+// Use the environment variable or default test key
+const YOCO_SECRET_KEY = process.env.YOCO_SECRET_KEY || 'sk_test_73ff60ff3mgAG1b03714801a36a5';
+const YOCO_API_URL = 'https://online.yoco.com/v1/checkout/';
+
+// Allow CORS for development
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Health check endpoint
@@ -30,9 +37,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Yoco checkout endpoint
 app.post('/api/create-yoco-checkout', async (req, res) => {
   try {
-    const { amountInCents, currency = 'ZAR', successUrl, cancelUrl, failureUrl, metadata } = req.body;
+    const { amountInCents, currency = 'ZAR', successUrl, cancelUrl, failureUrl, metadata, saveCard = false } = req.body;
     
     // Validate required fields
     if (typeof amountInCents !== 'number' || amountInCents < 200) {
@@ -41,32 +49,31 @@ app.post('/api/create-yoco-checkout', async (req, res) => {
       });
     }
 
-    // Get Yoco API key from environment variables
-    const YOCO_SECRET_KEY = process.env.YOCO_SECRET_KEY;
-    if (!YOCO_SECRET_KEY) {
-      console.error('YOCO_SECRET_KEY is not set in environment variables');
-      return res.status(500).json({ error: 'Payment service configuration error' });
-    }
-
     // Log request details for debugging (excluding sensitive data)
     console.log('Creating Yoco checkout for amount:', amountInCents, currency);
+
+    // Include idempotency key to prevent duplicate charges
+    const idempotencyKey = metadata?.idempotencyKey || 
+      `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
 
     // Create checkout session with Yoco API
     try {
       const response = await axios.post(
-        'https://online.yoco.com/v1/checkout/',
+        YOCO_API_URL,
         {
           amount: amountInCents,
           currency,
           success_url: successUrl,
           cancel_url: cancelUrl,
           failure_url: failureUrl,
-          metadata
+          metadata,
+          save_card: saveCard
         },
         {
           headers: {
             'Authorization': `Bearer ${YOCO_SECRET_KEY}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey
           }
         }
       );
@@ -90,27 +97,7 @@ app.post('/api/create-yoco-checkout', async (req, res) => {
   }
 });
 
-/**
- * Verify the webhook signature from Yoco
- */
-const verifyYocoSignature = (payload, signature, secret) => {
-  if (!secret || !signature) return false;
-  
-  const hmac = crypto.createHmac('sha256', secret);
-  const digest = hmac.update(payload).digest('hex');
-  
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(digest)
-    );
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-};
-
-// Webhook endpoint - verifies Yoco signature
+// Webhook endpoint for Yoco
 app.post('/api/webhook', express.raw({ type: '*/*' }), (req, res) => {
   const signature = req.headers['x-yoco-signature'];
   const payload = req.body.toString();
@@ -123,13 +110,13 @@ app.post('/api/webhook', express.raw({ type: '*/*' }), (req, res) => {
     return res.sendStatus(200);
   }
   
-  if (typeof signature === 'string' && verifyYocoSignature(payload, signature, webhookSecret)) {
+  // Verify webhook signature
+  const hmac = crypto.createHmac('sha256', webhookSecret);
+  const digest = hmac.update(payload).digest('hex');
+  
+  if (signature === digest) {
     console.log('Verified Yoco webhook:', payload);
-    
     // TODO: Update payment status in database
-    // This would typically call a function to update the payment status
-    // based on the webhook payload
-    
     return res.sendStatus(200);
   } else {
     console.warn('Yoco webhook signature verification failed');
@@ -137,6 +124,15 @@ app.post('/api/webhook', express.raw({ type: '*/*' }), (req, res) => {
   }
 });
 
+// Serve static files from the 'dist' directory
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// For any GET request, send index.html (SPA support)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+// Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log(`Accepting requests from: ${clientOrigin}`);

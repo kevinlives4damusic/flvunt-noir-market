@@ -1,9 +1,10 @@
 
 import { supabase } from './supabase';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
+import apiClient from './api';
 
-// Netlify function URL for creating Yoco checkout
-const createCheckoutUrl = '/.netlify/functions/create-yoco-checkout';
+// Use the API client from lib/api.ts for consistent error handling
+const createCheckoutUrl = '/api/create-yoco-checkout';
 
 // Get Yoco public key from environment variables
 const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY || 'pk_test_076a52e0R4velyDbbd24';
@@ -34,43 +35,81 @@ export const initiateYocoCheckout = async (
   saveCard: boolean = false
 ): Promise<YocoCheckoutResponse> => {
   try {
-    const response = await fetch(createCheckoutUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amountInCents,
-        currency,
-        successUrl,
-        cancelUrl, 
-        failureUrl,
-        metadata,
-        saveCard
-      }),
-    });
+    console.log('Initiating Yoco checkout with server.js instead of Netlify function');
+    
+    // First try to use the server.js endpoint
+    try {
+      const response = await fetch(`${window.location.origin}/api/create-yoco-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amountInCents,
+          currency,
+          successUrl,
+          cancelUrl, 
+          failureUrl,
+          metadata,
+          saveCard
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Yoco checkout error:', errorData);
-      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+
+      const data = await response.json();
       return {
-        success: false,
-        error: {
-          message: errorData.error || 'Failed to create checkout session',
-          detail: `HTTP Status: ${response.status}`
+        success: true,
+        data: {
+          redirectUrl: data.redirectUrl,
+          checkoutId: data.checkoutId
+        }
+      };
+    } catch (serverError) {
+      // Log the error but try Netlify function as fallback
+      console.warn('Error with server.js, trying Netlify function:', serverError);
+      
+      // Fallback to Netlify function
+      const response = await fetch('/.netlify/functions/create-yoco-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amountInCents,
+          currency,
+          successUrl,
+          cancelUrl, 
+          failureUrl,
+          metadata,
+          saveCard
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Yoco checkout error:', errorData);
+        
+        return {
+          success: false,
+          error: {
+            message: errorData.error || 'Failed to create checkout session',
+            detail: `HTTP Status: ${response.status}`
+          }
+        };
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: {
+          redirectUrl: data.redirectUrl,
+          checkoutId: data.checkoutId
         }
       };
     }
-
-    const data = await response.json();
-    return {
-      success: true,
-      data: {
-        redirectUrl: data.redirectUrl,
-        checkoutId: data.checkoutId
-      }
-    };
   } catch (error) {
     console.error('Error initiating Yoco checkout:', error);
     
