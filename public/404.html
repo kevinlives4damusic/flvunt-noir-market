@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -9,14 +10,17 @@
     // This script takes the current URL and converts the path and query
     // string into a hash-based route that GitHub Pages can handle
     (function() {
-      // Redirect to index.html with proper hash route
+      // Get the repository name from the URL or use a default
+      var repoName = 'flvunt-noir-market';
       var l = window.location;
-      var pathSegmentsToKeep = 1; // Change this to match your repo name depth
-      var repoName = 'flvunt-noir-market'; // Change this to your repo name
       
-      // Extract the path from the URL
+      // If using custom domain, path should just be the pathname
+      var usingCustomDomain = !l.hostname.includes('github.io');
+      var pathSegmentsToKeep = usingCustomDomain ? 0 : 1;
+      
+      // Extract the path prefix (repository name in URL)
       var path = l.pathname.split('/').slice(0, pathSegmentsToKeep + 1).join('/');
-      if (l.pathname.indexOf('/' + repoName) === 0) {
+      if (!usingCustomDomain && l.pathname.indexOf('/' + repoName) === 0) {
         path = '/' + repoName;
       }
       

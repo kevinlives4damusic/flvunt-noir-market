@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -28,6 +29,19 @@ app.use(express.json());
 
 // Serve static files from the 'dist' directory
 app.use(express.static('dist'));
+
+// Verify dist directory exists in production
+const checkDistDirectory = () => {
+  if (process.env.NODE_ENV === 'production') {
+    if (!fs.existsSync(path.join(__dirname, 'dist'))) {
+      console.error('ERROR: dist directory does not exist. Build the app before starting the server in production mode.');
+    } else {
+      console.log('dist directory exists and will be served');
+    }
+  }
+};
+
+checkDistDirectory();
 
 // API Routes
 app.post('/api/create-yoco-checkout', async (req, res) => {
@@ -57,6 +71,8 @@ app.post('/api/create-yoco-checkout', async (req, res) => {
     }
 
     console.log('Creating Yoco checkout for amount:', amountInCents, currency);
+    console.log('Success URL:', successUrl);
+    console.log('Failure URL:', failureUrl);
 
     // Include idempotency key to prevent duplicate charges
     const idempotencyKey = metadata?.idempotencyKey || 
@@ -108,7 +124,12 @@ app.post('/api/create-yoco-checkout', async (req, res) => {
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    nodejs: process.version,
+    env: process.env.NODE_ENV || 'development'
+  });
 });
 
 // API debug info route
@@ -123,6 +144,7 @@ app.get('/api/info', (req, res) => {
 
 // Handle React routing, return the main index.html for all routes
 app.get('*', (req, res) => {
+  console.log('Serving index.html for path:', req.path);
   res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
 });
 
@@ -134,4 +156,14 @@ app.listen(PORT, () => {
   console.log(`- GET /api/health`);
   console.log(`- GET /api/info`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
