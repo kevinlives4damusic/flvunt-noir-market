@@ -24,6 +24,8 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+      // Add explicit extensions to try when resolving imports
+      extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json']
     },
     build: {
       sourcemap: true,
@@ -31,7 +33,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             vendor: ['react', 'react-dom', 'react-router-dom'],
-            ui: ['@/components/ui']
+            ui: ['@/components/ui/index.ts'] // Reference an index file instead of the directory
           }
         }
       }
