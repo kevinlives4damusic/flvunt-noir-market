@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
@@ -51,7 +52,11 @@ const PaymentFailure = () => {
       );
 
       if (!checkoutResult.success) {
-        throw new Error(checkoutResult.error?.message || 'Failed to initiate payment');
+        const errorMessage = typeof checkoutResult.error === 'string' 
+          ? checkoutResult.error 
+          : checkoutResult.error?.message || 'Failed to initiate payment';
+        
+        throw new Error(errorMessage);
       }
 
       // Update order status to pending before redirect
