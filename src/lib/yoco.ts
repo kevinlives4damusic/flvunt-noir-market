@@ -2,6 +2,7 @@
 import { supabase } from './supabase';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
 import apiClient from './api';
+import { toast } from 'sonner';
 
 // Use the API client from lib/api.ts for consistent error handling
 const createCheckoutUrl = '/api/create-yoco-checkout';
@@ -35,63 +36,63 @@ export const initiateYocoCheckout = async (
   saveCard: boolean = false
 ): Promise<YocoCheckoutResponse> => {
   try {
-    console.log('Initiating Yoco checkout with server.js instead of Netlify function');
+    console.log('Initiating Yoco checkout with params:', { amountInCents, currency, successUrl, cancelUrl, failureUrl });
+    
+    const paymentData = {
+      amountInCents,
+      currency,
+      successUrl,
+      cancelUrl, 
+      failureUrl,
+      metadata,
+      saveCard
+    };
+    
+    let response;
+    let errorOccurred = false;
     
     // First try to use the server.js endpoint
     try {
-      const response = await fetch(`${window.location.origin}/api/create-yoco-checkout`, {
+      console.log('Attempting to use server.js endpoint...');
+      response = await fetch(`${window.location.origin}/api/create-yoco-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amountInCents,
-          currency,
-          successUrl,
-          cancelUrl, 
-          failureUrl,
-          metadata,
-          saveCard
-        }),
+        body: JSON.stringify(paymentData),
       });
 
       if (!response.ok) {
-        throw new Error(`Server responded with status: ${response.status}`);
+        console.warn(`Server responded with status: ${response.status}`);
+        errorOccurred = true;
       }
-
-      const data = await response.json();
-      return {
-        success: true,
-        data: {
-          redirectUrl: data.redirectUrl,
-          checkoutId: data.checkoutId
-        }
-      };
     } catch (serverError) {
       // Log the error but try Netlify function as fallback
-      console.warn('Error with server.js, trying Netlify function:', serverError);
-      
-      // Fallback to Netlify function
-      const response = await fetch('/.netlify/functions/create-yoco-checkout', {
+      console.warn('Error with server.js:', serverError);
+      errorOccurred = true;
+    }
+    
+    // If server.js failed, fallback to Netlify function
+    if (errorOccurred || !response) {
+      console.log('Falling back to Netlify function...');
+      response = await fetch('/.netlify/functions/create-yoco-checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amountInCents,
-          currency,
-          successUrl,
-          cancelUrl, 
-          failureUrl,
-          metadata,
-          saveCard
-        }),
+        body: JSON.stringify(paymentData),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Yoco checkout error:', errorData);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText || `HTTP Error: ${response.status}` };
+        }
         
+        console.error('Yoco checkout error from Netlify function:', errorData);
         return {
           success: false,
           error: {
@@ -100,13 +101,46 @@ export const initiateYocoCheckout = async (
           }
         };
       }
-
+    }
+    
+    if (!response) {
+      return {
+        success: false,
+        error: {
+          message: 'All payment endpoints failed',
+          detail: 'Both server.js and Netlify function attempts failed'
+        }
+      };
+    }
+    
+    try {
       const data = await response.json();
+      console.log('Checkout response:', data);
+      
+      if (!data.redirectUrl) {
+        return {
+          success: false,
+          error: {
+            message: 'Invalid checkout response',
+            detail: 'Response did not contain redirect URL'
+          }
+        };
+      }
+      
       return {
         success: true,
         data: {
           redirectUrl: data.redirectUrl,
           checkoutId: data.checkoutId
+        }
+      };
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError, 'Response text:', await response.text());
+      return {
+        success: false,
+        error: {
+          message: 'Failed to parse checkout response',
+          detail: parseError instanceof Error ? parseError.message : 'Unknown error'
         }
       };
     }
@@ -132,13 +166,21 @@ export const verifyYocoPayment = async (checkoutId: string): Promise<{
   error?: PaymentError;
 }> => {
   try {
+    console.log('Verifying payment with checkout ID:', checkoutId);
+    
     // Query our database for the payment record
     const { data: payments, error } = await supabase
       .from('payments')
       .select('*')
       .eq('checkout_id', checkoutId);
     
-    if (error || !payments || payments.length === 0) {
+    if (error) {
+      console.error('Supabase query error:', error);
+      throw error;
+    }
+    
+    if (!payments || payments.length === 0) {
+      console.warn('No payment found for checkout ID:', checkoutId);
       return {
         success: false,
         error: createPaymentError(
@@ -150,6 +192,7 @@ export const verifyYocoPayment = async (checkoutId: string): Promise<{
     }
     
     const payment = payments[0];
+    console.log('Found payment:', payment);
     const isSuccessful = payment.status === 'succeeded';
     
     return {

@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createPayment } from '@/lib/payment-service';
 import { handlePaymentError } from '@/lib/payment-errors';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface PaymentProcessorProps {
   orderId: string;
@@ -35,9 +36,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
 
   // Get the current URL for success/cancel/failure redirects
   const baseUrl = window.location.origin;
-  const successUrl = `${baseUrl}/#/payment-success?orderId=${orderId}`;
-  const cancelUrl = `${baseUrl}/#/payment-cancel?orderId=${orderId}`;
-  const failureUrl = `${baseUrl}/#/payment-failure?orderId=${orderId}`;
+  const successUrl = `${baseUrl}/payment-success?orderId=${orderId}`;
+  const cancelUrl = `${baseUrl}/payment-cancel?orderId=${orderId}`;
+  const failureUrl = `${baseUrl}/payment-failure?orderId=${orderId}`;
 
   const handlePaymentInitiation = async () => {
     setIsLoading(true);
@@ -45,13 +46,24 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Authentication error:', authError);
+        throw new Error('Authentication error: ' + authError.message);
+      }
+      
       if (!user) {
         setError('You must be logged in to make a payment.');
         setIsLoading(false);
         if (onError) onError('Authentication required');
+        toast.error('Authentication required', {
+          description: 'Please log in to continue with the payment'
+        });
         return;
       }
+      
+      console.log('Creating payment for order:', orderId);
       
       // Create payment and initiate checkout
       const result = await createPayment({
@@ -72,6 +84,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         const errorMessage = result.error ? handlePaymentError(result.error) : 'Failed to initiate payment';
         setError(errorMessage);
         if (onError) onError(errorMessage);
+        toast.error('Payment initiation failed', {
+          description: errorMessage
+        });
       } else {
         console.log('Payment initiated, redirecting to:', result.redirectUrl);
         // Redirect to Yoco checkout
@@ -82,6 +97,9 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       setError(errorMessage);
       if (onError) onError(errorMessage);
+      toast.error('Payment error', {
+        description: errorMessage
+      });
     } finally {
       setIsLoading(false);
     }

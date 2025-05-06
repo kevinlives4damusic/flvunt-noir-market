@@ -13,7 +13,7 @@ if (!rootElement) {
 
 const root = createRoot(rootElement);
 
-// Error boundary for the entire app
+// Enhanced error handling with detailed feedback
 const ErrorFallback = ({ error }: { error: Error }) => {
   console.error('Application Error:', error);
   return (
@@ -23,6 +23,11 @@ const ErrorFallback = ({ error }: { error: Error }) => {
         <p className="mb-4 text-gray-700">The application encountered an error. Please refresh the page or try again later.</p>
         <pre className="bg-gray-100 p-3 rounded overflow-auto text-sm mb-4">
           {error.message}
+          {error.stack && (
+            <div className="mt-2 text-xs text-gray-600">
+              {error.stack.split('\n').slice(1, 4).join('\n')}
+            </div>
+          )}
         </pre>
         <button 
           onClick={() => window.location.reload()} 
@@ -36,13 +41,19 @@ const ErrorFallback = ({ error }: { error: Error }) => {
 };
 
 try {
+  // Add debugging info during initialization
+  console.log('Initializing application...');
+  console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL || 'Not defined');
+  console.log('Supabase Anon Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+  
   root.render(
     <StrictMode>
-      <ErrorBoundary>
+      <ErrorBoundary fallback={<ErrorFallback error={new Error('Application failed to render properly')} />}>
         <App />
       </ErrorBoundary>
     </StrictMode>
   );
+  console.log('Application rendered successfully');
 } catch (error) {
   console.error('Error rendering application:', error);
   root.render(<ErrorFallback error={error instanceof Error ? error : new Error('Unknown error')} />);

@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { getOrder, updateOrderStatus } from '@/lib/orderService';
 import { initiateYocoCheckout } from '@/lib/yoco';
-import { toastError } from '@/components/ui/toast-with-progress';
+import { toast } from 'sonner';
 
 const PaymentFailure = () => {
   const [searchParams] = useSearchParams();
@@ -16,7 +16,12 @@ const PaymentFailure = () => {
   useEffect(() => {
     const updateOrder = async () => {
       if (orderId) {
-        await updateOrderStatus(orderId, 'failed');
+        try {
+          await updateOrderStatus(orderId, 'failed');
+          console.log('Order status updated to failed');
+        } catch (error) {
+          console.error('Error updating order status:', error);
+        }
       }
     };
     updateOrder();
@@ -24,7 +29,9 @@ const PaymentFailure = () => {
 
   const handleRetry = async () => {
     if (!orderId) {
-      toastError('Error', 'Cannot retry payment: Order ID not found');
+      toast.error('Error', {
+        description: 'Cannot retry payment: Order ID not found'
+      });
       return;
     }
 
@@ -52,6 +59,7 @@ const PaymentFailure = () => {
       );
 
       if (!checkoutResult.success) {
+        // Safely handle error which could be a string or an object with a message property
         const errorMessage = typeof checkoutResult.error === 'string' 
           ? checkoutResult.error 
           : checkoutResult.error?.message || 'Failed to initiate payment';
@@ -67,9 +75,9 @@ const PaymentFailure = () => {
       
     } catch (error) {
       setRetrying(false);
-      toastError(
+      toast.error(
         'Retry Failed',
-        error instanceof Error ? error.message : 'Failed to retry payment'
+        { description: error instanceof Error ? error.message : 'Failed to retry payment' }
       );
     }
   };
