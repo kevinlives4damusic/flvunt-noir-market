@@ -59,7 +59,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         amountInCents: amount,
         currency,
         successUrl,
-        cancelUrl,
+        cancelUrl, 
         failureUrl,
         saveCard, // Pass the saveCard option
         metadata: {
@@ -124,14 +124,14 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               You'll be redirected to our secure payment provider to complete your purchase.
             </p>
             
-            <div className="flex items-center justify-center mt-4">
+            <div className="flex items-center justify-center mt-4 bg-black p-3 rounded">
               <img 
-                src="/images/yoco-logo.svg" 
+                src="/images/yoco-logo-white.svg" 
                 alt="Yoco Secure Payments" 
                 className="h-8"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://cdn.yoco.co.za/images/za/logos/yoco-logo.svg';
+                  target.src = '/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png';
                 }}
               />
             </div>

@@ -1,3 +1,4 @@
+
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -318,14 +319,14 @@ const Payment = () => {
                 />
               </div>
               
-              <div className="flex items-center justify-center mt-6">
+              <div className="flex items-center justify-center mt-6 bg-black p-4 rounded">
                 <img 
-                  src="/images/yoco-logo.svg" 
+                  src="/images/yoco-logo-white.svg" 
                   alt="Yoco Payment Provider" 
                   className="h-10" 
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = 'https://cdn.yoco.co.za/images/za/logos/yoco-logo.svg';
+                    target.src = '/lovable-uploads/697e0904-5b34-4da2-8456-8191cae847a8.png';
                   }}
                 />
               </div>
