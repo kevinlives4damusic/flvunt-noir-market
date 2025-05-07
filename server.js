@@ -9,20 +9,26 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables from .env.local
+// Load environment variables from .env.local or .env if available
 dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' }); // Fallback to .env if .env.local doesn't exist
 
 const app = express();
 const port = process.env.PORT || 5000;
 const clientOrigin = process.env.CLIENT_BASE_URL || 'http://localhost:8080';
 
-// Enable CORS with proper configuration
-app.use(cors({
-  origin: ['http://localhost:8080', 'http://localhost:5173'],
+// Enable CORS with proper configuration for both development and production
+const isDevelopment = process.env.NODE_ENV === 'development';
+const corsOptions = {
+  origin: isDevelopment 
+    ? ['http://localhost:8080', 'http://localhost:5173']
+    : '*', // Allow all origins in production
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
-}));
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
@@ -167,10 +173,11 @@ app.post('/api/webhook', express.raw({ type: '*/*' }), (req, res) => {
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  console.log('CORS enabled for:', ['http://localhost:8080', 'http://localhost:5173']);
+  console.log('CORS enabled for:', isDevelopment ? ['http://localhost:8080', 'http://localhost:5173'] : 'All origins');
   console.log('Environment:', {
-    NODE_ENV: process.env.NODE_ENV,
+    NODE_ENV: process.env.NODE_ENV || 'not set',
     port,
-    clientOrigin
+    clientOrigin,
+    apiMode: isDevelopment ? 'development' : 'production'
   });
 });

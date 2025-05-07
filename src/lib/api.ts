@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const apiBaseUrl = '/.netlify/functions';  // Always use Netlify Functions
+// Dynamically set the API base URL based on environment
+const apiBaseUrl = process.env.NODE_ENV === 'production' 
+  ? '/.netlify/functions'  // Use Netlify Functions in production
+  : '/api';               // Use local Express server in development
+
+console.log('API Base URL:', apiBaseUrl, 'Environment:', process.env.NODE_ENV);
 
 // Create an axios instance for API calls
 const apiClient = axios.create({

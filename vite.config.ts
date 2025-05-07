@@ -7,6 +7,7 @@ import { componentTagger } from "lovable-tagger"
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '')
+  const isProduction = mode === 'production'
   
   return {
     plugins: [
@@ -43,12 +44,12 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
+      // Make environment variables available to the client
       'process.env.VITE_YOCO_PUBLIC_KEY': JSON.stringify(env.VITE_YOCO_PUBLIC_KEY || ''),
-      'process.env.API_BASE_URL': JSON.stringify(
-        process.env.NODE_ENV === 'production' 
-          ? '/.netlify/functions' 
-          : '/api'
-      ),
+      // Always use the correct API base URL based on environment
+      'process.env.API_BASE_URL': JSON.stringify(isProduction ? '/.netlify/functions' : '/api'),
+      // Make the environment available to the client
+      'process.env.NODE_ENV': JSON.stringify(mode)
     }
   }
 })
