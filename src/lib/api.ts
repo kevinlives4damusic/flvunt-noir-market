@@ -1,9 +1,14 @@
 import axios from 'axios';
 
 // Dynamically set the API base URL based on environment
-const apiBaseUrl = process.env.NODE_ENV === 'production' 
-  ? '/.netlify/functions'  // Use Netlify Functions in production
-  : '/api';               // Use local Express server in development
+const isProduction = process.env.NODE_ENV === 'production';
+
+// For GitHub Pages deployment, we need to use an absolute URL for the API
+// In production, you'll need to set up a backend service (e.g., a separate API server)
+// For now, we'll use a mock API for demonstration purposes
+const apiBaseUrl = isProduction
+  ? 'https://kevinlives4damusic-api.herokuapp.com/api' // Replace with your actual API server URL
+  : '/api'; // Use local Express server in development
 
 console.log('API Base URL:', apiBaseUrl, 'Environment:', process.env.NODE_ENV);
 

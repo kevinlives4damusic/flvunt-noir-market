@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mode === 'development' && componentTagger(),
     ].filter(Boolean),
-    base: '/', // Always use root path for Netlify
+    base: isProduction ? '/flvunt-noir-market/' : '/', // Use repo name for GitHub Pages
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
