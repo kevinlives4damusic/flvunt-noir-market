@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { createOrder } from '@/lib/orderService';
 import { PaymentProcessor } from '@/components/checkout/PaymentProcessor';
 import { PaymentVerification } from '@/components/checkout/PaymentVerification';
-import { initiateYocoCheckout } from '@/lib/yoco';
+import { initiatePolarCheckout } from '@/lib/polar';
 import { getSavedPaymentMethods } from '@/lib/payment-service';
 import { CreditCardInput } from '@/components/checkout/CreditCardInput';
 import { useBeforeUnload } from '../hooks/use-before-unload';
@@ -48,7 +48,7 @@ const Payment = () => {
   const { isAuthenticated, items, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [paymentMethod, setPaymentMethod] = useState('yoco');
+  const [paymentMethod, setPaymentMethod] = useState('polar');
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -246,9 +246,9 @@ const Payment = () => {
         return;
       }
       
-      // For non-Yoco payment methods, you would implement different logic here
-      if (paymentMethod !== 'yoco') {
-        toast.error('Only Yoco payments are supported at this time');
+      // Only Polar is supported now
+      if (paymentMethod !== 'polar') {
+        toast.error('Only Polar payments are supported at this time');
         setProcessing(false);
         return;
       }
@@ -266,8 +266,8 @@ const Payment = () => {
           lastFour: cardNumber.replace(/\s/g, '').slice(-4)
         };
         
-        // Initiate Yoco checkout
-        const result = await initiateYocoCheckout(
+        // Initiate Polar checkout
+        const result = await initiatePolarCheckout(
           Math.round(total * 100),
           'ZAR',
           successUrl,
@@ -283,7 +283,7 @@ const Payment = () => {
             'Payment creation failed');
         }
         
-        // Redirect to the Yoco checkout page
+        // Redirect to the Polar checkout page
         window.location.href = result.data.redirectUrl;
       } catch (error) {
         console.error('Payment processing error:', error);
@@ -337,11 +337,11 @@ const Payment = () => {
               
               <div className="space-y-3 mb-6">
                 <PaymentMethod 
-                  id="yoco" 
+                  id="polar" 
                   name="Credit/Debit Card" 
                   icon={<CreditCard className="h-5 w-5" />} 
-                  selected={paymentMethod === 'yoco'} 
-                  onSelect={() => setPaymentMethod('yoco')} 
+                  selected={paymentMethod === 'polar'} 
+                  onSelect={() => setPaymentMethod('polar')} 
                 />
               </div>
               
@@ -359,7 +359,7 @@ const Payment = () => {
                 </label>
               </div>
               
-              {paymentMethod === 'yoco' && (
+              {paymentMethod === 'polar' && (
                 <div className="space-y-4 animate-fade-in">
                   {savedMethods.length > 0 && (
                     <div className="border rounded-md p-3 bg-gray-50">
@@ -425,11 +425,7 @@ const Payment = () => {
                 <div className="mt-4 text-center border-t pt-4 w-full">
                   <p className="text-sm text-gray-500 mb-2">Secure payments by</p>
                   <div className="flex justify-center items-center">
-                    <img 
-                      src="/images/Yoco.svg" 
-                      alt="Yoco" 
-                      className="h-8 mx-auto" 
-                    />
+                    <span className="text-sm">Polar</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Your card details are securely processed and protected by 256-bit encryption
@@ -445,7 +441,7 @@ const Payment = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="p-4 border-t mt-4 text-sm text-gray-600">
                   <p className="mb-2">
-                    All transactions are secure and encrypted. Card details are processed by Yoco, a trusted payment provider.
+                     All transactions are secure and encrypted. Card details are processed by our payment provider.
                   </p>
                   <p className="mb-2">
                     We accept Visa, Mastercard, American Express, and Diners Club cards.

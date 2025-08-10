@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Pass environment variables to the client
-      'process.env.VITE_YOCO_PUBLIC_KEY': JSON.stringify(env.VITE_YOCO_PUBLIC_KEY),
+      // no Polar public key needed client-side
       // Add API URL for production vs development
       'process.env.API_BASE_URL': JSON.stringify('/api')
     }

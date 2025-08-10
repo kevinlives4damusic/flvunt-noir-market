@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { createCheckout } from './api';
+import { createPolarCheckout } from './api';
 import { auth } from './firebase';
 import { PaymentErrorCode, createPaymentError, PaymentError } from './payment-errors';
 
@@ -88,7 +88,7 @@ export const initiateYocoCheckout = async (
     };
 
     // Call our serverless function via the API client
-    const result = await createCheckout(
+    const result = await createPolarCheckout(
       amountInCents,
       currency,
       successUrl,

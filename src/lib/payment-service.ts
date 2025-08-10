@@ -80,7 +80,7 @@ export const createPayment = async ({
       amount_cents: amountInCents,
       currency,
       status: 'pending',
-      payment_provider: 'yoco',
+      payment_provider: 'polar',
       provider_payment_id: null,
       checkout_id: null,
       checkout_url: null,

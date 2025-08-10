@@ -12,8 +12,8 @@ const apiClient = axios.create({
   timeout: 15000,
 });
 
-// API functions for Yoco checkout
-export const createCheckout = async (
+// API function for Polar checkout
+export const createPolarCheckout = async (
   amountInCents: number,
   currency: string = 'ZAR',
   successUrl?: string,
@@ -23,7 +23,7 @@ export const createCheckout = async (
   saveCard: boolean = false
 ) => {
   try {
-    const response = await apiClient.post('/create-yoco-checkout', {
+    const response = await apiClient.post('/create-polar-checkout', {
       amountInCents,
       currency,
       successUrl,
@@ -38,7 +38,7 @@ export const createCheckout = async (
       data: response.data as { redirectUrl: string; checkoutId: string; paymentId?: string }
     };
   } catch (error) {
-    console.error('Error creating checkout:', error);
+    console.error('Error creating Polar checkout:', error);
     return {
       success: false,
       error: axios.isAxiosError(error) 

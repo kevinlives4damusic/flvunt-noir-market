@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { verifyYocoPayment } from '@/lib/yoco';
+// Polar checkout verification can be handled by our DB status only
 import { verifyPayment } from '@/lib/payment-service';
 
 interface PaymentVerificationProps {
@@ -27,13 +27,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
       }
 
       try {
-        // First verify with Yoco directly
-        const yocoResult = await verifyYocoPayment(checkoutId);
-        if (!yocoResult.success) {
-          throw new Error(yocoResult.error?.message || 'Payment verification failed');
-        }
-
-        // Then verify and update our records
+        // Verify using our backend record only (Polar webhook updates it)
         const result = await verifyPayment(paymentId);
         if (!result.success) {
           throw new Error(result.error?.message || 'Payment verification failed');
