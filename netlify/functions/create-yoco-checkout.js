@@ -84,6 +84,7 @@ export const handler = async (event, context) => {
     // Update existing payment if provided, otherwise create a new record as a fallback
     const nowIso = new Date().toISOString();
     const paymentIdFromClient = metadata?.paymentId;
+    let createdPaymentId = paymentIdFromClient || null;
     try {
       if (paymentIdFromClient) {
         await db.collection('payments').doc(paymentIdFromClient).set({
@@ -93,7 +94,7 @@ export const handler = async (event, context) => {
           metadata: { ...metadata, saveCard },
         }, { merge: true });
       } else {
-        await db.collection('payments').add({
+        const docRef = await db.collection('payments').add({
           order_id: metadata.orderId || null,
           amount_cents: amountInCents,
           currency,
@@ -107,13 +108,14 @@ export const handler = async (event, context) => {
           created_at: nowIso,
           updated_at: nowIso,
         });
+        createdPaymentId = docRef.id;
       }
     } catch (firestoreError) {
       // Log but do not fail the checkout creation – client will still receive the redirect URL
       console.warn('Firestore write failed during checkout creation:', firestoreError);
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ redirectUrl, checkoutId }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ redirectUrl, checkoutId, paymentId: createdPaymentId }) };
   } catch (error) {
     console.error('Error creating Yoco checkout:', error.response?.data || error);
 

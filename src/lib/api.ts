@@ -35,7 +35,7 @@ export const createCheckout = async (
 
     return {
       success: true,
-      data: response.data
+      data: response.data as { redirectUrl: string; checkoutId: string; paymentId?: string }
     };
   } catch (error) {
     console.error('Error creating checkout:', error);

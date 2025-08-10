@@ -117,13 +117,20 @@ export const createPayment = async ({
       };
     }
 
-    await updateDoc(doc(db(), 'payments', paymentDoc.id), {
+    // If the function created the payment server-side, align ids
+    const returnedPaymentId = checkoutResult.data?.paymentId;
+    const targetPaymentId = returnedPaymentId || paymentDoc.id;
+    if (returnedPaymentId && returnedPaymentId !== paymentDoc.id) {
+      // Optionally we could delete the original, but we simply keep updating the returned id
+      // and let webhook update status consistently.
+    }
+    await updateDoc(doc(db(), 'payments', targetPaymentId), {
       checkout_id: checkoutResult.data?.checkoutId ?? null,
       checkout_url: checkoutResult.data?.redirectUrl ?? null,
       updated_at: new Date().toISOString(),
     });
 
-    const updated = await getPaymentById(paymentDoc.id);
+    const updated = await getPaymentById(targetPaymentId);
     return { success: true, payment: updated!, redirectUrl: checkoutResult.data?.redirectUrl };
   } catch (error) {
     console.error('Payment creation error:', error);

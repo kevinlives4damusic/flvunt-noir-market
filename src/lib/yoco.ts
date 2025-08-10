@@ -24,6 +24,7 @@ export interface YocoCheckoutResponse {
   data?: {
     checkoutId?: string;
     redirectUrl?: string;
+    paymentId?: string;
   };
   error?: YocoError | PaymentError;
 }

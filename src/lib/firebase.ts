@@ -27,12 +27,9 @@ export async function initFirebase(): Promise<{ app: FirebaseApp; analytics: Ana
     authInstance = getAuth(appInstance);
   }
   if (!dbInstance) {
-    // Prefer transports that avoid WebChannel 400s in some networks/proxies
+    // Auto-detect long polling to handle restrictive networks/CDNs
     dbInstance = initializeFirestore(appInstance, {
-      // Try long polling first (most reliable across restrictive networks)
-      experimentalForceLongPolling: true,
-      // Use Fetch-based streams instead of XHR when available
-      useFetchStreams: true,
+      experimentalAutoDetectLongPolling: true,
     } as any);
   }
   if (!analyticsInstance && typeof window !== 'undefined' && (await isSupported())) {
