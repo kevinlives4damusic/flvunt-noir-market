@@ -1,5 +1,6 @@
-import { supabase } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 export interface OrderItem {
   product_id: string;
@@ -23,7 +24,7 @@ const generateOrderNumber = () => {
 
 export const createOrder = async (params: CreateOrderParams) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User must be authenticated to create an order');
     }
@@ -35,45 +36,38 @@ export const createOrder = async (params: CreateOrderParams) => {
       metadata
     } = params;
 
-    // Start a transaction
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        user_id: user.id,
-        order_number: generateOrderNumber(),
-        amount_cents,
-        currency,
-        metadata,
-        status: 'pending'
-      })
-      .select()
-      .single();
+    // Create order document
+    const orderRef = await addDoc(collection(db(), 'orders'), {
+      user_id: user.uid,
+      order_number: generateOrderNumber(),
+      amount_cents,
+      currency,
+      metadata: metadata ?? null,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
-    if (orderError) {
-      console.error('Error creating order:', orderError);
-      throw orderError;
-    }
-
-    // Insert order items
-    const orderItems = items.map(item => ({
-      order_id: order.id,
-      ...item
-    }));
-
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
-
-    if (itemsError) {
-      console.error('Error creating order items:', itemsError);
-      throw itemsError;
-    }
+    // Create order items as a subcollection
+    const itemsCol = collection(db(), 'orders', orderRef.id, 'order_items');
+    await Promise.all(
+      items.map((item) => addDoc(itemsCol, {
+        ...item,
+        created_at: new Date().toISOString(),
+      }))
+    );
 
     return { 
       success: true, 
       data: { 
-        ...order, 
-        items: orderItems 
+        id: orderRef.id,
+        user_id: user.uid,
+        order_number: generateOrderNumber(),
+        amount_cents,
+        currency,
+        metadata: metadata ?? null,
+        status: 'pending',
+        items,
       } 
     };
 
@@ -88,26 +82,25 @@ export const createOrder = async (params: CreateOrderParams) => {
 
 export const updateOrderStatus = async (orderId: string, status: string, paymentId?: string) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User must be authenticated to update order status');
     }
 
-    const { data, error } = await supabase
-      .from('orders')
-      .update({
-        status,
-        payment_id: paymentId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-      .eq('user_id', user.id) // Ensure user owns the order
-      .select()
-      .single();
+    const orderDoc = doc(db(), 'orders', orderId);
+    const snap = await getDoc(orderDoc);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data();
+    if (data.user_id !== user.uid) throw new Error('Permission denied');
 
-    if (error) throw error;
+    await updateDoc(orderDoc, {
+      status,
+      payment_id: paymentId ?? null,
+      updated_at: new Date().toISOString(),
+    });
 
-    return { success: true, data };
+    const updated = await getDoc(orderDoc);
+    return { success: true, data: { id: updated.id, ...updated.data() } };
   } catch (error) {
     console.error('Error updating order status:', error);
     return {
@@ -119,32 +112,25 @@ export const updateOrderStatus = async (orderId: string, status: string, payment
 
 export const getOrder = async (orderId: string) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User must be authenticated to view orders');
     }
 
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', orderId)
-      .eq('user_id', user.id) // Ensure user owns the order
-      .single();
+    const orderDocRef = doc(db(), 'orders', orderId);
+    const orderSnap = await getDoc(orderDocRef);
+    if (!orderSnap.exists()) throw new Error('Order not found');
+    const order = { id: orderSnap.id, ...orderSnap.data() } as any;
+    if (order.user_id !== user.uid) throw new Error('Permission denied');
 
-    if (orderError) throw orderError;
-
-    const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId);
-
-    if (itemsError) throw itemsError;
+    const itemsSnap = await getDocs(collection(db(), 'orders', orderId, 'order_items'));
+    const items = itemsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     return { 
       success: true, 
       data: { 
         ...order, 
-        items: items || [] 
+        items 
       } 
     };
   } catch (error) {
@@ -158,21 +144,25 @@ export const getOrder = async (orderId: string) => {
 
 export const getUserOrders = async () => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User must be authenticated to view orders');
     }
 
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (*)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
+    const q = query(
+      collection(db(), 'orders'),
+      where('user_id', '==', user.uid),
+      orderBy('created_at', 'desc'),
+    );
+    const snap = await getDocs(q);
+    const data = await Promise.all(
+      snap.docs.map(async (d) => {
+        const order = { id: d.id, ...d.data() } as any;
+        const itemsSnap = await getDocs(collection(db(), 'orders', d.id, 'order_items'));
+        const items = itemsSnap.docs.map((idoc) => ({ id: idoc.id, ...idoc.data() }));
+        return { ...order, items };
+      })
+    );
 
     return { success: true, data };
   } catch (error) {

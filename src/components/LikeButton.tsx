@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface LikeButtonProps {
   productId: string;
@@ -10,30 +13,49 @@ interface LikeButtonProps {
 
 const LikeButton: React.FC<LikeButtonProps> = ({ productId, initialLiked = false }) => {
   const [isLiked, setIsLiked] = useState(initialLiked);
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Load liked state from localStorage
-    const likedProducts = JSON.parse(localStorage.getItem('likedProducts') || '{}');
-    setIsLiked(!!likedProducts[productId]);
-  }, [productId]);
+    const load = async () => {
+      if (user) {
+        const ref = doc(db(), 'users', user.uid, 'likes', productId);
+        const snap = await getDoc(ref);
+        setIsLiked(snap.exists());
+      } else {
+        const likedProducts = JSON.parse(localStorage.getItem('likedProducts') || '{}');
+        setIsLiked(!!likedProducts[productId]);
+      }
+    };
+    void load();
+  }, [productId, user]);
 
-  const handleLike = () => {
-    const likedProducts = JSON.parse(localStorage.getItem('likedProducts') || '{}');
-    
-    if (isLiked) {
-      delete likedProducts[productId];
-      toast({
-        description: 'Removed from favorites',
-      });
-    } else {
-      likedProducts[productId] = true;
-      toast({
-        description: 'Added to favorites',
-      });
+  const handleLike = async () => {
+    try {
+      if (user) {
+        const ref = doc(db(), 'users', user.uid, 'likes', productId);
+        if (isLiked) {
+          await deleteDoc(ref);
+          toast({ description: 'Removed from favorites' });
+        } else {
+          await setDoc(ref, { created_at: new Date().toISOString() });
+          toast({ description: 'Added to favorites' });
+        }
+      } else {
+        const likedProducts = JSON.parse(localStorage.getItem('likedProducts') || '{}');
+        if (isLiked) {
+          delete likedProducts[productId];
+          toast({ description: 'Removed from favorites' });
+        } else {
+          likedProducts[productId] = true;
+          toast({ description: 'Added to favorites' });
+        }
+        localStorage.setItem('likedProducts', JSON.stringify(likedProducts));
+      }
+      setIsLiked(!isLiked);
+    } catch (error) {
+      console.error('Like toggle failed', error);
+      toast({ description: 'Failed to update favorites' });
     }
-    
-    localStorage.setItem('likedProducts', JSON.stringify(likedProducts));
-    setIsLiked(!isLiked);
   };
 
   return (

@@ -1,10 +1,11 @@
-import { supabase } from './supabase';
 import { initiateYocoCheckout } from './yoco';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
-import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import { PaymentStatus, isValidTransition, getTransitionDescription } from './payment-status';
+import { auth, db } from './firebase';
+import { addDoc, collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 
-export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled' | 'refunded' | 'partially_refunded';
+export type LocalPaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled' | 'refunded' | 'partially_refunded';
 
 export interface CreatePaymentParams {
   orderId: string;
@@ -15,6 +16,7 @@ export interface CreatePaymentParams {
   failureUrl?: string;
   saveCard?: boolean;
   metadata?: Record<string, any>;
+  idempotencyKey?: string;
 }
 
 export interface Payment {
@@ -22,7 +24,7 @@ export interface Payment {
   orderId: string;
   amountInCents: number;
   currency: string;
-  status: PaymentStatus;
+  status: LocalPaymentStatus;
   paymentProvider: string;
   providerPaymentId: string | null;
   checkoutId: string | null;
@@ -33,9 +35,13 @@ export interface Payment {
   updatedAt: string;
 }
 
-/**
- * Creates a new payment record and initiates the Yoco checkout process
- */
+const checkIdempotency = async (idempotencyKey: string): Promise<Payment | null> => {
+  const q = query(collection(db(), 'payments'), where('metadata.idempotencyKey', '==', idempotencyKey));
+  const snap = await getDocs(q as any);
+  if (snap.empty) return null;
+  return mapPaymentFromDb({ id: snap.docs[0].id, ...(snap.docs[0].data() as Record<string, unknown>) });
+};
+
 export const createPayment = async ({
   orderId,
   amountInCents,
@@ -44,100 +50,81 @@ export const createPayment = async ({
   cancelUrl,
   failureUrl,
   saveCard = false,
-  metadata = {}
+  metadata = {},
+  idempotencyKey = uuidv4()
 }: CreatePaymentParams): Promise<{ success: boolean; payment?: Payment; error?: PaymentError; redirectUrl?: string }> => {
   try {
-    // Generate a unique idempotency key to prevent duplicate payments
-    const idempotencyKey = uuidv4();
-    
-    // Create payment record in database
-    const { data: payment, error: dbError } = await supabase
-      .from('payments')
-      .insert({
-        order_id: orderId,
-        amount_cents: amountInCents,
-        currency,
-        status: 'pending',
-        payment_provider: 'yoco',
-        metadata: { ...metadata, idempotencyKey }
-      })
-      .select()
-      .single();
-      
-    if (dbError) {
-      console.error('Error creating payment record:', dbError);
+    const user = auth().currentUser;
+    if (!user) {
       return {
         success: false,
         error: createPaymentError(
-          PaymentErrorCode.PAYMENT_CREATION_FAILED,
-          'Failed to create payment record',
-          dbError.message,
-          dbError
+          PaymentErrorCode.AUTHENTICATION_REQUIRED,
+          'User must be authenticated to make payments'
         )
       };
     }
-    
-    // Initiate Yoco checkout
+
+    const existingPayment = await checkIdempotency(idempotencyKey);
+    if (existingPayment) {
+      if (!['succeeded', 'failed', 'canceled'].includes(existingPayment.status)) {
+        return { success: true, payment: existingPayment, redirectUrl: existingPayment.checkoutUrl };
+      }
+      idempotencyKey = uuidv4();
+    }
+
+    const nowIso = new Date().toISOString();
+    const paymentDoc = await addDoc(collection(db(), 'payments'), {
+      order_id: orderId,
+      user_id: user.uid,
+      amount_cents: amountInCents,
+      currency,
+      status: 'pending',
+      payment_provider: 'yoco',
+      provider_payment_id: null,
+      checkout_id: null,
+      checkout_url: null,
+      error_message: null,
+      metadata: { ...metadata, idempotencyKey },
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+
     const checkoutResult = await initiateYocoCheckout(
       amountInCents,
       currency,
       successUrl,
       cancelUrl,
       failureUrl,
-      { 
-        ...metadata, 
-        paymentId: payment.id,
-        orderId,
-        idempotencyKey
-      },
-      saveCard // Pass the saveCard option
+      { ...metadata, paymentId: paymentDoc.id, orderId, idempotencyKey },
+      saveCard
     );
-    
+
     if (!checkoutResult.success) {
-      // Update payment record with error
-      await supabase
-        .from('payments')
-        .update({
-          status: 'failed',
-          error_message: checkoutResult.error?.message,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', payment.id);
-        
+      await updateDoc(doc(db(), 'payments', paymentDoc.id), {
+        status: 'failed',
+        error_message: checkoutResult.error?.message ?? 'Checkout failed',
+        updated_at: new Date().toISOString(),
+      });
       return {
         success: false,
-        payment: mapPaymentFromDb(payment),
+        payment: await getPaymentById(paymentDoc.id) ?? undefined,
         error: createPaymentError(
           PaymentErrorCode.CHECKOUT_FAILED,
           checkoutResult.error?.message || 'Failed to create checkout',
-          checkoutResult.error?.detail,
-          checkoutResult.error
+          (checkoutResult.error as any)?.detail
         )
       };
     }
-    
-    // Update payment with checkout info
-    const { data: updatedPayment, error: updateError } = await supabase
-      .from('payments')
-      .update({
-        checkout_id: checkoutResult.data?.checkoutId,
-        checkout_url: checkoutResult.data?.redirectUrl,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', payment.id)
-      .select()
-      .single();
-      
-    if (updateError) {
-      console.error('Error updating payment with checkout info:', updateError);
-      // Continue anyway since the checkout was created successfully
-    }
-    
-    return {
-      success: true,
-      payment: mapPaymentFromDb(updatedPayment || payment),
-      redirectUrl: checkoutResult.data?.redirectUrl
-    };
+
+    await updateDoc(doc(db(), 'payments', paymentDoc.id), {
+      checkout_id: checkoutResult.data?.checkoutId ?? null,
+      checkout_url: checkoutResult.data?.redirectUrl ?? null,
+      updated_at: new Date().toISOString(),
+    });
+
+    const updated = await getPaymentById(paymentDoc.id);
+    return { success: true, payment: updated!, redirectUrl: checkoutResult.data?.redirectUrl };
   } catch (error) {
     console.error('Payment creation error:', error);
     return {
@@ -152,76 +139,28 @@ export const createPayment = async ({
   }
 };
 
-/**
- * Gets a payment by ID
- */
 export const getPaymentById = async (paymentId: string): Promise<Payment | null> => {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('id', paymentId)
-    .single();
-    
-  if (error || !data) {
-    console.error('Error fetching payment:', error);
-    return null;
-  }
-  
-  return mapPaymentFromDb(data);
+  const snap = await getDoc(doc(db(), 'payments', paymentId));
+  if (!snap.exists()) return null;
+  return mapPaymentFromDb({ id: snap.id, ...(snap.data() as Record<string, unknown>) });
 };
 
-/**
- * Gets all payments for an order
- */
 export const getPaymentsByOrderId = async (orderId: string): Promise<Payment[]> => {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('order_id', orderId)
-    .order('created_at', { ascending: false });
-    
-  if (error) {
-    console.error('Error fetching payments for order:', error);
-    return [];
-  }
-  
-  return (data || []).map(mapPaymentFromDb);
+  const q = query(collection(db(), 'payments'), where('order_id', '==', orderId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => mapPaymentFromDb({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
-/**
- * Verifies a payment's status with Yoco
- * This should be called after a user returns from the Yoco checkout page
- */
 export const verifyPayment = async (paymentId: string): Promise<{ success: boolean; payment?: Payment; error?: PaymentError }> => {
   try {
-    // Get the payment from the database
     const payment = await getPaymentById(paymentId);
     if (!payment) {
-      return {
-        success: false,
-        error: createPaymentError(
-          PaymentErrorCode.PAYMENT_VERIFICATION_FAILED,
-          'Payment not found',
-          `No payment found with ID ${paymentId}`
-        )
-      };
+      return { success: false, error: createPaymentError(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED, 'Payment not found', `No payment found with ID ${paymentId}`) };
     }
-    
-    // If payment is already in a final state, return it
     if (['succeeded', 'failed', 'canceled', 'refunded', 'partially_refunded'].includes(payment.status)) {
-      return {
-        success: payment.status === 'succeeded',
-        payment
-      };
+      return { success: payment.status === 'succeeded', payment };
     }
-    
-    // TODO: Implement Yoco payment verification API call here
-    // For now, we'll rely on webhooks to update the payment status
-    
-    return {
-      success: payment.status === 'succeeded',
-      payment
-    };
+    return { success: payment.status === 'succeeded', payment };
   } catch (error) {
     console.error('Payment verification error:', error);
     return {
@@ -236,28 +175,16 @@ export const verifyPayment = async (paymentId: string): Promise<{ success: boole
   }
 };
 
-/**
- * Updates an order's status based on a successful payment
- */
 export const updateOrderAfterSuccessfulPayment = async (
   orderId: string, 
   paymentId: string
 ): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('orders')
-      .update({
-        status: 'paid',
-        payment_id: paymentId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId);
-      
-    if (error) {
-      console.error('Error updating order after payment:', error);
-      return false;
-    }
-    
+    await updateDoc(doc(db(), 'orders', orderId), {
+      status: 'paid',
+      payment_id: paymentId,
+      updated_at: new Date().toISOString(),
+    });
     return true;
   } catch (error) {
     console.error('Error updating order after payment:', error);
@@ -265,21 +192,75 @@ export const updateOrderAfterSuccessfulPayment = async (
   }
 };
 
-/**
- * Maps a database payment record to the Payment interface
- */
+export interface SavedPaymentMethod {
+  method_id: string;
+  provider: 'yoco';
+  brand: string;
+  last4: string;
+  created_at: string;
+}
+
+export const getSavedPaymentMethods = async (): Promise<SavedPaymentMethod[]> => {
+  const user = auth().currentUser;
+  if (!user) return [];
+  const snap = await getDocs(collection(db(), 'users', user.uid, 'payment_methods'));
+  return snap.docs.map((d) => ({ method_id: d.id, ...(d.data() as any) }));
+};
+
 const mapPaymentFromDb = (dbPayment: any): Payment => ({
   id: dbPayment.id,
   orderId: dbPayment.order_id,
   amountInCents: dbPayment.amount_cents,
   currency: dbPayment.currency,
-  status: dbPayment.status as PaymentStatus,
+  status: dbPayment.status as LocalPaymentStatus,
   paymentProvider: dbPayment.payment_provider,
-  providerPaymentId: dbPayment.provider_payment_id,
-  checkoutId: dbPayment.checkout_id,
-  checkoutUrl: dbPayment.checkout_url,
-  errorMessage: dbPayment.error_message,
-  metadata: dbPayment.metadata,
+  providerPaymentId: dbPayment.provider_payment_id ?? null,
+  checkoutId: dbPayment.checkout_id ?? null,
+  checkoutUrl: dbPayment.checkout_url ?? null,
+  errorMessage: dbPayment.error_message ?? null,
+  metadata: dbPayment.metadata ?? null,
   createdAt: dbPayment.created_at,
   updatedAt: dbPayment.updated_at
 });
+
+const updatePaymentStatus = async (
+  paymentId: string,
+  newStatus: PaymentStatus,
+  metadata?: Record<string, any>
+): Promise<{ success: boolean; error?: PaymentError }> => {
+  try {
+    const payment = await getPaymentById(paymentId);
+    if (!payment) {
+      return { success: false, error: createPaymentError(PaymentErrorCode.PAYMENT_NOT_FOUND, 'Payment not found', `No payment found with ID ${paymentId}`) };
+    }
+
+    if (!isValidTransition(payment.status, newStatus)) {
+      return {
+        success: false,
+        error: createPaymentError(
+          PaymentErrorCode.INVALID_STATUS_TRANSITION,
+          'Invalid status transition',
+          getTransitionDescription(payment.status, newStatus)
+        )
+      };
+    }
+
+    await updateDoc(doc(db(), 'payments', paymentId), {
+      status: newStatus,
+      metadata: { ...(payment.metadata || {}), ...metadata },
+      updated_at: new Date().toISOString(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in updatePaymentStatus:', error);
+    return {
+      success: false,
+      error: createPaymentError(
+        PaymentErrorCode.UPDATE_FAILED,
+        'Failed to update payment status',
+        error instanceof Error ? error.message : 'Unknown error'
+      )
+    };
+  }
+};

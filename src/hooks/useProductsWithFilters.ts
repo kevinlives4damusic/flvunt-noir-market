@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Product } from "./useProducts";
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export interface ProductFilters {
   category?: string;
@@ -17,61 +18,35 @@ export function useProductsWithFilters(filters: ProductFilters = {}) {
   return useQuery({
     queryKey: ["products", filters],
     queryFn: async (): Promise<Product[]> => {
-      let query = supabase
-        .from("products")
-        .select("*");
-      
-      // Apply category filter
-      if (filters.category) {
-        query = query.eq("category", filters.category);
-      }
+      try {
+        let qRef = collection(db(), 'products');
+        const constraints: any[] = [];
+        if (filters.category) constraints.push(where('category', '==', filters.category));
+        if (filters.inStock !== undefined) constraints.push(where('in_stock', '==', !!filters.inStock));
+        // Firestore cannot do advanced OR text search; we'll post-filter below
+        const q = constraints.length > 0 ? query(qRef, ...constraints, orderBy('created_at', 'desc')) : query(qRef, orderBy('created_at', 'desc'));
+        const snap = await getDocs(q);
+        let items = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as Product[];
 
-      // Apply price range filters
-      if (filters.minPrice !== undefined) {
-        query = query.gte("price", filters.minPrice);
-      }
-      
-      if (filters.maxPrice !== undefined) {
-        query = query.lte("price", filters.maxPrice);
-      }
+        // Client-side filters for price, designers, sizes, and search
+        if (filters.minPrice !== undefined) items = items.filter(p => p.price >= filters.minPrice!);
+        if (filters.maxPrice !== undefined) items = items.filter(p => p.price <= filters.maxPrice!);
+        if (filters.designers && filters.designers.length > 0) items = items.filter(p => filters.designers!.includes(p.designer));
+        if (filters.sizes && filters.sizes.length > 0) items = items.filter(p => p.available_sizes?.some(s => filters.sizes!.includes(s)));
+        if (filters.searchQuery) {
+          const ql = filters.searchQuery.toLowerCase();
+          items = items.filter(p => (
+            (p.name || '').toLowerCase().includes(ql) ||
+            (p.description || '').toLowerCase().includes(ql)
+          ));
+        }
 
-      // Apply designer filter
-      if (filters.designers && filters.designers.length > 0) {
-        query = query.in("designer", filters.designers);
-      }
-
-      // Apply size filter using contains operator for the available_sizes array
-      if (filters.sizes && filters.sizes.length > 0) {
-        // For each size, we need to check if it's in the available_sizes array
-        // This creates a complex OR condition for each size
-        const sizeConditions = filters.sizes.map(size => 
-          `available_sizes::text LIKE '%${size}%'`
-        );
-        
-        query = query.or(sizeConditions.join(","));
-      }
-
-      // Apply in-stock filter
-      if (filters.inStock !== undefined) {
-        query = query.eq("in_stock", filters.inStock);
-      }
-
-      // Apply search query filter
-      if (filters.searchQuery) {
-        query = query.or(
-          `name.ilike.%${filters.searchQuery}%,description.ilike.%${filters.searchQuery}%`
-        );
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
+        return items;
+      } catch (error) {
         toast("Error loading products");
         console.error("Error fetching products with filters:", error);
         return [];
       }
-
-      return data || [];
     },
   });
 }

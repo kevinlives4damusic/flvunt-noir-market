@@ -1,46 +1,37 @@
-import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import crypto from 'crypto';
+import admin from 'firebase-admin';
 
 dotenv.config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const YOCO_WEBHOOK_SECRET = process.env.YOCO_WEBHOOK_SECRET;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
+// Initialize Firebase Admin (service account via env var GOOGLE_APPLICATION_CREDENTIALS or env-based config)
+if (!admin.apps.length) {
+  try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id,
+      });
+    } else {
+      admin.initializeApp();
+    }
+  } catch (e) {
+    console.error('Failed to initialize Firebase Admin SDK', e);
+  }
 }
 
-if (!YOCO_WEBHOOK_SECRET) {
-  console.warn('YOCO_WEBHOOK_SECRET is not set. Webhook signature verification will be skipped.');
-}
+const db = admin.firestore();
 
-// Initialize Supabase client with service role for admin privileges
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-/**
- * Verify the webhook signature from Yoco
- * @param {string} payload - The raw request body
- * @param {string} signature - The signature from the X-Yoco-Signature header
- * @param {string} secret - The webhook secret
- * @returns {boolean} - Whether the signature is valid
- */
 const verifyYocoSignature = (payload, signature, secret) => {
   if (!secret || !signature) return false;
-  
   const hmac = crypto.createHmac('sha256', secret);
   const digest = hmac.update(payload).digest('hex');
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(digest)
-  );
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 };
 
-/**
- * Map Yoco payment status to our internal payment status
- */
 const mapYocoStatus = (yocoStatus) => {
   switch (yocoStatus) {
     case 'succeeded':
@@ -60,146 +51,79 @@ const mapYocoStatus = (yocoStatus) => {
   }
 };
 
-/**
- * Update payment record in database
- */
-const updatePayment = async (checkoutId, paymentData) => {
-  // Find payment by checkout ID
-  const { data: payments, error: findError } = await supabaseAdmin
-    .from('payments')
-    .select('*')
-    .eq('checkout_id', checkoutId);
-    
-  if (findError || !payments || payments.length === 0) {
-    console.error('Payment not found for checkout ID:', checkoutId);
-    return { success: false, error: 'Payment not found' };
-  }
-  
-  const payment = payments[0];
-  
-  // Update payment with new status and provider payment ID
-  const { data, error: updateError } = await supabaseAdmin
-    .from('payments')
-    .update({
-      status: mapYocoStatus(paymentData.status),
-      provider_payment_id: paymentData.payment_id,
-      updated_at: new Date().toISOString(),
-      metadata: {
-        ...payment.metadata,
-        yocoWebhookData: paymentData
-      }
-    })
-    .eq('id', payment.id)
-    .select()
-    .single();
-    
-  if (updateError) {
-    console.error('Error updating payment:', updateError);
-    return { success: false, error: updateError };
-  }
-  
-  return { success: true, payment: data };
-};
-
-/**
- * Update order status after successful payment
- */
-const updateOrderAfterPayment = async (orderId, paymentId, status) => {
-  // Only update order if payment was successful
-  if (status !== 'succeeded') return { success: true };
-  
-  const { error } = await supabaseAdmin
-    .from('orders')
-    .update({
-      status: 'paid',
-      payment_id: paymentId,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', orderId);
-    
-  if (error) {
-    console.error('Error updating order after payment:', error);
-    return { success: false, error };
-  }
-  
-  return { success: true };
-};
-
 export const handler = async (event, context) => {
-  // Only accept POST requests
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
-  
+
   try {
     const payload = event.body;
     const signature = event.headers['x-yoco-signature'];
     const paymentData = JSON.parse(payload);
-    
-    // Log webhook event for debugging
+
     console.log('Received Yoco webhook:', {
       event: paymentData.type,
       checkoutId: paymentData.checkout_id,
       status: paymentData.status
     });
-    
-    // Verify webhook signature if secret is available
+
     if (YOCO_WEBHOOK_SECRET && !verifyYocoSignature(payload, signature, YOCO_WEBHOOK_SECRET)) {
       console.error('Invalid webhook signature');
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Invalid signature' })
-      };
+      return { statusCode: 401, body: JSON.stringify({ error: 'Invalid signature' }) };
     }
-    
-    // Process different webhook event types
-    switch (paymentData.type) {
-      case 'payment.succeeded':
-      case 'payment.failed':
-      case 'payment.canceled':
-      case 'payment.processing':
-      case 'payment.refunded':
-      case 'payment.partially_refunded':
-        // Update payment record
-        const updateResult = await updatePayment(paymentData.checkout_id, paymentData);
-        
-        if (!updateResult.success) {
-          return {
-            statusCode: 404,
-            body: JSON.stringify({ error: updateResult.error })
-          };
-        }
-        
-        // Update order if payment was successful
-        if (updateResult.payment) {
-          await updateOrderAfterPayment(
-            updateResult.payment.order_id,
-            updateResult.payment.id,
-            updateResult.payment.status
-          );
-        }
-        
-        break;
-        
-      default:
-        console.log('Unhandled webhook event type:', paymentData.type);
+
+    const checkoutId = paymentData.checkout_id;
+    const newStatus = mapYocoStatus(paymentData.status);
+
+    // Find payment by checkout ID
+    const paymentsRef = db.collection('payments');
+    const paymentsSnap = await paymentsRef.where('checkout_id', '==', checkoutId).limit(1).get();
+
+    if (paymentsSnap.empty) {
+      console.warn('Payment not found for checkout ID:', checkoutId);
+      return { statusCode: 200, body: JSON.stringify({ message: 'No matching payment, acknowledged' }) };
     }
-    
-    // Always return 200 to acknowledge receipt
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ received: true })
-    };
-    
+
+    const paymentDoc = paymentsSnap.docs[0];
+    const payment = paymentDoc.data();
+
+    await paymentDoc.ref.update({
+      status: newStatus,
+      provider_payment_id: paymentData.payment_id ?? null,
+      updated_at: new Date().toISOString(),
+      metadata: { ...(payment.metadata || {}), yocoWebhookData: paymentData }
+    });
+
+    // Save a placeholder payment method for the user if requested
+    const saveCard = payment.metadata?.saveCard || paymentData.metadata?.saveCard;
+    const userId = payment.metadata?.userId || paymentData.metadata?.userId;
+    if (newStatus === 'succeeded' && saveCard && userId) {
+      const methodId = `yoco_token_${String(checkoutId || '').slice(-8)}`;
+      const brand = paymentData.card_brand || paymentData.metadata?.brand || 'card';
+      const last4 = paymentData.last4 || paymentData.metadata?.lastFour || '0000';
+      await db.collection('users').doc(userId).collection('payment_methods').doc(methodId).set({
+        provider: 'yoco',
+        method_id: methodId,
+        brand,
+        last4,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { merge: true });
+    }
+
+    // Update order if successful
+    if (newStatus === 'succeeded' && payment.order_id) {
+      const orderRef = db.collection('orders').doc(payment.order_id);
+      await orderRef.update({
+        status: 'paid',
+        payment_id: paymentDoc.id,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ received: true }) };
   } catch (error) {
     console.error('Error processing webhook:', error);
-    
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };

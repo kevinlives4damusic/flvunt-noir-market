@@ -115,6 +115,15 @@ const PaymentSuccess = () => {
               <p className="text-sm text-gray-600 mb-6">
                 You will receive an email confirmation with your order details shortly.
               </p>
+
+              <div className="mt-6 bg-white/60 backdrop-blur-md border border-white/30 rounded-lg p-5 text-left">
+                <h3 className="text-md font-medium mb-2">Save your card for faster checkout next time?</h3>
+                <p className="text-sm text-gray-600 mb-4">We'll securely associate this card with your account for one-click payments on your next purchase.</p>
+                <div className="flex gap-3">
+                  <Link to="/" className="px-4 py-2 rounded-md bg-black text-white hover:bg-gray-800 transition-colors">Yes, save my card</Link>
+                  <Link to="/" className="px-4 py-2 rounded-md border border-gray-300 hover:border-gray-400 transition-colors">No, maybe later</Link>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-gray-600 mb-8">

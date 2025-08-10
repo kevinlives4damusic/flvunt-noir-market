@@ -1,7 +1,8 @@
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export interface Product {
   id: string;
@@ -21,23 +22,17 @@ export function useProducts(category?: string) {
   return useQuery({
     queryKey: ["products", category],
     queryFn: async (): Promise<Product[]> => {
-      let query = supabase
-        .from("products")
-        .select("*");
-      
-      if (category) {
-        query = query.eq("category", category);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
+      try {
+        let qRef = collection(db(), 'products');
+        let q = category ? query(qRef, where('category', '==', category)) : qRef;
+        const snap = await getDocs(q as any);
+        const products = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as Product[];
+        return products;
+      } catch (error) {
         toast("Error loading products");
         console.error("Error fetching products:", error);
         return [];
       }
-
-      return data || [];
     },
   });
 }

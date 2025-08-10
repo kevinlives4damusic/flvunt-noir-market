@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.payments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
-  amount_cents INTEGER NOT NULL,
+  amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
   currency TEXT NOT NULL DEFAULT 'ZAR',
   status TEXT NOT NULL DEFAULT 'pending',
   payment_provider TEXT NOT NULL DEFAULT 'yoco',
@@ -12,13 +12,34 @@ CREATE TABLE IF NOT EXISTS public.payments (
   error_message TEXT,
   metadata JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT unique_checkout_id UNIQUE (checkout_id),
+  CONSTRAINT unique_provider_payment_id UNIQUE (provider_payment_id),
+  CONSTRAINT valid_status CHECK (
+    status IN ('pending', 'processing', 'succeeded', 'failed', 'canceled', 'refunded', 'partially_refunded')
+  )
 );
 
--- Add indexes for common queries
+-- Add indexes for common queries and performance
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON public.payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_checkout_id ON public.payments(checkout_id);
+CREATE INDEX IF NOT EXISTS idx_payments_created_at ON public.payments(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_idempotency ON public.payments USING GIN ((metadata->>'idempotencyKey'));
+
+-- Add trigger for updating updated_at timestamp
+CREATE OR REPLACE FUNCTION update_payments_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_payments_timestamp
+  BEFORE UPDATE ON public.payments
+  FOR EACH ROW
+  EXECUTE FUNCTION update_payments_updated_at();
 
 -- Add RLS policies for payments table
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;

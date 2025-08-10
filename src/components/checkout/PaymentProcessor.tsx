@@ -6,7 +6,7 @@ import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { createPayment } from '@/lib/payment-service';
 import { handlePaymentError } from '@/lib/payment-errors';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 interface PaymentProcessorProps {
   orderId: string;
@@ -31,6 +31,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Get the current URL for success/cancel/failure redirects
   const baseUrl = window.location.origin;
@@ -43,8 +44,6 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('You must be logged in to make a payment.');
         setIsLoading(false);

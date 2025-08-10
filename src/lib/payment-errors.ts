@@ -12,7 +12,9 @@ export enum PaymentErrorCode {
   ORDER_NOT_FOUND = 'ORDER_NOT_FOUND',
   PAYMENT_NOT_FOUND = 'PAYMENT_NOT_FOUND',
   WEBHOOK_VERIFICATION_FAILED = 'WEBHOOK_VERIFICATION_FAILED',
-  IDEMPOTENCY_VIOLATION = 'IDEMPOTENCY_VIOLATION'
+  IDEMPOTENCY_VIOLATION = 'IDEMPOTENCY_VIOLATION',
+  INVALID_STATUS_TRANSITION = 'INVALID_STATUS_TRANSITION',
+  UPDATE_FAILED = 'UPDATE_FAILED'
 }
 
 export interface PaymentError {
@@ -62,6 +64,10 @@ export const getUserFriendlyErrorMessage = (error: PaymentError): string => {
       return 'Payment verification failed. Please contact support if your payment was successful but not reflected.';
     case PaymentErrorCode.IDEMPOTENCY_VIOLATION:
       return 'This payment request has already been processed. Please check your order history.';
+    case PaymentErrorCode.INVALID_STATUS_TRANSITION:
+      return 'The payment status transition is invalid. Please try again or contact support.';
+    case PaymentErrorCode.UPDATE_FAILED:
+      return 'Failed to update payment status. Please try again or contact support.';
     default:
       return 'An error occurred while processing your payment. Please try again or contact support.';
   }

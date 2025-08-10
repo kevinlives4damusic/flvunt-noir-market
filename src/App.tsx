@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Suspense } from 'react';
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -19,7 +19,10 @@ import PaymentCancel from "./pages/PaymentCancel";
 import PaymentFailure from "./pages/PaymentFailure";
 import Contact from "./pages/Contact";
 import Likes from "./pages/Likes";
-import CartProvider from "./context/CartContext";
+import AuthCallback from "./components/auth/AuthCallback";
+import { CartProvider } from "./context/CartContext";
+import { AuthProvider } from '@/context/AuthContext';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useState } from 'react'
 import './App.css'
 
@@ -32,37 +35,64 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <HashRouter>
+      <Router>
         <TooltipProvider>
           <Suspense fallback={
             <div className="flex items-center justify-center min-h-screen">
               <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-black"></div>
             </div>
           }>
-            <CartProvider>
-              <Toaster />
-              <Sonner />
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="/payment" element={<Payment />} />
-                <Route path="/payment-success" element={<PaymentSuccess />} />
-                <Route path="/payment-cancel" element={<PaymentCancel />} />
-                <Route path="/payment-failure" element={<PaymentFailure />} />
-                <Route path="/hoodies" element={<Hoodies />} />
-                <Route path="/shirts" element={<Shirts />} />
-                <Route path="/truckers" element={<Truckers />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/likes" element={<Likes />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </CartProvider>
+            <AuthProvider>
+              <CartProvider>
+                <Toaster />
+                <Sonner />
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/cart" element={
+                    <ProtectedRoute>
+                      <Cart />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/checkout" element={
+                    <ProtectedRoute>
+                      <Checkout />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/payment" element={
+                    <ProtectedRoute>
+                      <Payment />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/payment-success" element={
+                    <ProtectedRoute>
+                      <PaymentSuccess />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/payment-cancel" element={
+                    <ProtectedRoute>
+                      <PaymentCancel />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/payment-failure" element={
+                    <ProtectedRoute>
+                      <PaymentFailure />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/hoodies" element={<Hoodies />} />
+                  <Route path="/shirts" element={<Shirts />} />
+                  <Route path="/truckers" element={<Truckers />} />
+                  <Route path="/likes" element={<Likes />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </CartProvider>
+            </AuthProvider>
           </Suspense>
         </TooltipProvider>
-      </HashRouter>
+      </Router>
     </QueryClientProvider>
   )
 };

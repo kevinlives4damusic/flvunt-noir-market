@@ -1,7 +1,7 @@
-import React, { createContext, useState, ReactNode, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import React, { createContext, useState, ReactNode, useEffect, useContext } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
 
 interface CartItem {
   id: string | number;
@@ -23,7 +23,7 @@ interface CartContextType {
   logout: () => Promise<void>;
 }
 
-const CartContext = createContext<CartContextType>({
+export const CartContext = createContext<CartContextType>({
   items: [],
   addToCart: () => {},
   removeFromCart: () => {},
@@ -34,47 +34,28 @@ const CartContext = createContext<CartContextType>({
   logout: async () => {}
 });
 
-const CartProvider = ({ children }: { children: ReactNode }) => {
+// Named export for the provider component
+export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initializeCart = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setIsAuthenticated(!!session);
-        setUserEmail(session?.user?.email ?? null);
-
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
           setItems(JSON.parse(savedCart));
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('Cart initialization error:', error);
       } finally {
         setIsInitialized(true);
       }
     };
 
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      setUserEmail(session?.user?.email ?? null);
-      
-      if (session) {
-        localStorage.setItem('supabase_session', JSON.stringify(session));
-      } else {
-        localStorage.removeItem('supabase_session');
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    initializeCart();
   }, []);
 
   useEffect(() => {
@@ -127,17 +108,12 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
     // Save cart items before logout
     const cartItems = [...items];
     
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error('Error signing out');
-    } else {
-      // Restore cart items after logout instead of clearing them
-      setItems(cartItems);
-      // Update localStorage with the preserved cart
-      localStorage.setItem('cart', JSON.stringify(cartItems));
-      navigate('/');
-      toast.success('Logged out successfully');
-    }
+    await signOut();
+    
+    // Restore cart items after logout
+    setItems(cartItems);
+    localStorage.setItem('cart', JSON.stringify(cartItems));
+    toast.success('Logged out successfully');
   };
 
   if (!isInitialized) {
@@ -151,14 +127,20 @@ const CartProvider = ({ children }: { children: ReactNode }) => {
       removeFromCart,
       updateQuantity,
       clearCart,
-      isAuthenticated,
-      userEmail,
+      isAuthenticated: !!user,
+      userEmail: user?.email ?? null,
       logout 
     }}>
       {children}
     </CartContext.Provider>
   );
-};
+}
 
-export { CartContext, CartProvider };
-export default CartProvider;
+// Named export for the hook
+export function useCart() {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
+  return context;
+}

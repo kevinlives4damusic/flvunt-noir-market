@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import admin from 'firebase-admin';
 
 dotenv.config();
 
@@ -10,7 +11,22 @@ if (!YOCO_SECRET_KEY) {
   throw new Error('YOCO_SECRET_KEY is not set in environment variables');
 }
 
-exports.handler = async (event, context) => {
+if (!admin.apps.length) {
+  try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id,
+      });
+    } else {
+      admin.initializeApp();
+    }
+  } catch {}
+}
+const db = admin.firestore();
+
+export const handler = async (event, context) => {
   // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -20,18 +36,11 @@ exports.handler = async (event, context) => {
 
   // Handle preflight request
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers
-    };
+    return { statusCode: 204, headers };
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   try {
@@ -41,18 +50,13 @@ exports.handler = async (event, context) => {
       successUrl,
       cancelUrl,
       failureUrl,
-      metadata 
+      metadata = {},
+      saveCard = false
     } = JSON.parse(event.body);
 
     // Validate required fields
     if (!amountInCents || amountInCents < 200) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid amount. Minimum amount is R2.00 (200 cents)' 
-        }),
-      };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid amount. Minimum amount is R2.00 (200 cents)' }) };
     }
 
     // Create checkout session with Yoco
@@ -64,7 +68,7 @@ exports.handler = async (event, context) => {
         success_url: successUrl,
         cancel_url: cancelUrl,
         failure_url: failureUrl,
-        metadata
+        metadata: { ...metadata, saveCard }
       },
       {
         headers: {
@@ -74,30 +78,49 @@ exports.handler = async (event, context) => {
       }
     );
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        redirectUrl: response.data.url,
-        checkoutId: response.data.id
-      }),
-    };
+    const checkoutId = response.data.id;
+    const redirectUrl = response.data.url;
+
+    // Update existing payment if provided, otherwise create a new record as a fallback
+    const nowIso = new Date().toISOString();
+    const paymentIdFromClient = metadata?.paymentId;
+    try {
+      if (paymentIdFromClient) {
+        await db.collection('payments').doc(paymentIdFromClient).set({
+          checkout_id: checkoutId,
+          checkout_url: redirectUrl,
+          updated_at: nowIso,
+          metadata: { ...metadata, saveCard },
+        }, { merge: true });
+      } else {
+        await db.collection('payments').add({
+          order_id: metadata.orderId || null,
+          amount_cents: amountInCents,
+          currency,
+          status: 'pending',
+          payment_provider: 'yoco',
+          provider_payment_id: null,
+          checkout_id: checkoutId,
+          checkout_url: redirectUrl,
+          error_message: null,
+          metadata: { ...metadata, saveCard },
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+      }
+    } catch (firestoreError) {
+      // Log but do not fail the checkout creation – client will still receive the redirect URL
+      console.warn('Firestore write failed during checkout creation:', firestoreError);
+    }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ redirectUrl, checkoutId }) };
   } catch (error) {
     console.error('Error creating Yoco checkout:', error.response?.data || error);
 
-    // Handle Yoco API errors
     if (error.response?.data) {
-      return {
-        statusCode: error.response.status,
-        headers,
-        body: JSON.stringify({ error: error.response.data.message || 'Payment service error' }),
-      };
+      return { statusCode: error.response.status, headers, body: JSON.stringify({ error: error.response.data.message || 'Payment service error' }) };
     }
 
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'Internal server error' }),
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) };
   }
 };

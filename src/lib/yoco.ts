@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { createCheckout } from './api';
-import { supabase } from './supabase';
+import { auth } from './firebase';
 import { PaymentErrorCode, createPaymentError, PaymentError } from './payment-errors';
 
 const yocoPublicKey = import.meta.env.VITE_YOCO_PUBLIC_KEY;
+const YOCO_API_BASE = 'https://online.yoco.com/v1';
 
 if (!yocoPublicKey) {
   console.warn('Yoco Public Key is not defined in environment variables.');
@@ -64,7 +65,7 @@ export const initiateYocoCheckout = async (
     }
 
     // Get the current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth().currentUser;
     if (!user) {
       return {
         success: false,
@@ -79,7 +80,8 @@ export const initiateYocoCheckout = async (
     // Add user ID and timestamp to metadata for tracking
     const enrichedMetadata = {
       ...metadata,
-      userId: user.id,
+      userId: user.uid,
+      userEmail: user.email,
       timestamp: new Date().toISOString(),
       environment: import.meta.env.MODE || 'development'
     };
@@ -91,7 +93,8 @@ export const initiateYocoCheckout = async (
       successUrl,
       cancelUrl,
       failureUrl,
-      enrichedMetadata
+      enrichedMetadata,
+      saveCard
     );
 
     if (!result.success) {
@@ -136,6 +139,39 @@ export const initiateYocoCheckout = async (
         error instanceof Error ? error.message : 'Unknown error occurred',
         'An unexpected error occurred while creating the checkout',
         error
+      )
+    };
+  }
+};
+
+export const verifyYocoPayment = async (checkoutId: string): Promise<{ 
+  success: boolean; 
+  status?: string; 
+  error?: PaymentError;
+}> => {
+  try {
+    const response = await axios.get(
+      `${YOCO_API_BASE}/checkouts/${checkoutId}/status`,
+      {
+        headers: {
+          'Authorization': `Bearer ${yocoPublicKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return {
+      success: true,
+      status: response.data.status
+    };
+  } catch (error) {
+    console.error('Error verifying Yoco payment:', error);
+    return {
+      success: false,
+      error: createPaymentError(
+        PaymentErrorCode.PAYMENT_VERIFICATION_FAILED,
+        error instanceof Error ? error.message : 'Failed to verify payment',
+        'Could not verify payment status with Yoco'
       )
     };
   }

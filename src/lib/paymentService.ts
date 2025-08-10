@@ -71,25 +71,63 @@ export const formatAmount = (amount: number, currency: string = 'ZAR'): string =
 
 export const validateCardNumber = (cardNumber: string): boolean => {
   const cleaned = cardNumber.replace(/\D/g, '');
-  return cleaned.length >= 13 && cleaned.length <= 16;
+  if (cleaned.length < 13 || cleaned.length > 16) return false;
+
+  // Luhn algorithm validation
+  let sum = 0;
+  let isEven = false;
+  
+  // Loop through values starting from the rightmost
+  for (let i = cleaned.length - 1; i >= 0; i--) {
+    let digit = parseInt(cleaned.charAt(i));
+
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+
+    sum += digit;
+    isEven = !isEven;
+  }
+
+  return sum % 10 === 0;
 };
 
-export const validateExpiryDate = (expiryDate: string): boolean => {
+export const getCardType = (cardNumber: string): string => {
+  const cleaned = cardNumber.replace(/\D/g, '');
+  if (cleaned.match(/^4/)) return 'visa';
+  if (cleaned.match(/^5[1-5]/)) return 'mastercard';
+  if (cleaned.match(/^3[47]/)) return 'amex';
+  if (cleaned.match(/^6/)) return 'discover';
+  return 'unknown';
+};
+
+export const validateExpiryDate = (expiryDate: string): { isValid: boolean; error?: string } => {
   const [month, year] = expiryDate.split('/').map(Number);
-  if (!month || !year) return false;
+  if (!month || !year) return { isValid: false, error: 'Invalid format' };
   
   const currentYear = new Date().getFullYear() % 100;
   const currentMonth = new Date().getMonth() + 1;
   
-  return (
-    month >= 1 && 
-    month <= 12 && 
-    year >= currentYear && 
-    (year > currentYear || month >= currentMonth)
-  );
+  if (month < 1 || month > 12) return { isValid: false, error: 'Invalid month' };
+  if (year < currentYear) return { isValid: false, error: 'Card has expired' };
+  if (year === currentYear && month < currentMonth) return { isValid: false, error: 'Card has expired' };
+  
+  return { isValid: true };
 };
 
-export const validateCVV = (cvv: string): boolean => {
+export const validateCVV = (cvv: string, cardType: string = 'unknown'): { isValid: boolean; error?: string } => {
   const cleaned = cvv.replace(/\D/g, '');
-  return cleaned.length >= 3 && cleaned.length <= 4;
+  const requiredLength = cardType === 'amex' ? 4 : 3;
+  
+  if (cleaned.length !== requiredLength) {
+    return { 
+      isValid: false, 
+      error: `CVV must be ${requiredLength} digits${cardType === 'amex' ? ' for American Express' : ''}`
+    };
+  }
+  
+  return { isValid: true };
 };

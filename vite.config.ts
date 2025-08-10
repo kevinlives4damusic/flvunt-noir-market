@@ -33,11 +33,7 @@ export default defineConfig(({ mode }) => {
       // Pass environment variables to the client
       'process.env.VITE_YOCO_PUBLIC_KEY': JSON.stringify(env.VITE_YOCO_PUBLIC_KEY),
       // Add API URL for production vs development
-      'process.env.API_BASE_URL': JSON.stringify(
-        process.env.NODE_ENV === 'production' 
-          ? `https://api.netlify.com/.netlify/functions` 
-          : '/api'
-      ),
+      'process.env.API_BASE_URL': JSON.stringify('/api')
     }
   }
 })

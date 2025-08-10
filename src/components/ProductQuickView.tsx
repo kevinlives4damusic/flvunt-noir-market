@@ -80,22 +80,22 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[780px] p-0 overflow-hidden border border-white/20 bg-white/60 backdrop-blur-xl shadow-2xl">
         <button 
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 rounded-full bg-white/90 p-1 text-gray-500 hover:text-gray-800 z-10"
+          className="absolute right-4 top-4 rounded-full bg-white/80 backdrop-blur-md p-1 text-gray-700 hover:text-black z-10 border border-white/40"
         >
           <X className="h-5 w-5" />
         </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-          <div className="bg-gray-100 aspect-square">
+          <div className="bg-gray-100/60 aspect-square backdrop-blur-sm">
             <img 
               src={product.image_url} 
               alt={product.name} 
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="p-6 flex flex-col">
+          <div className="p-6 flex flex-col bg-white/50 backdrop-blur-md">
             <DialogHeader>
               <DialogTitle className="text-xl font-normal">{product.name}</DialogTitle>
               <DialogDescription asChild>
@@ -116,10 +116,10 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
                   {['S', 'M', 'L', 'XL'].map((size) => (
                     <button 
                       key={size}
-                      className={`w-10 h-10 border flex items-center justify-center transition-colors ${
+                      className={`w-10 h-10 border flex items-center justify-center transition-colors rounded-md backdrop-blur-sm ${
                         selectedSize === size 
                           ? 'border-black bg-black text-white' 
-                          : 'border-gray-300 hover:border-black'
+                          : 'border-white/40 bg-white/60 hover:border-black'
                       }`}
                       onClick={() => handleSizeSelect(size)}
                     >
@@ -133,14 +133,14 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
             <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
               <Button 
                 onClick={handleAddToCart} 
-                className="flvunt-button w-full"
+                className="flvunt-button w-full backdrop-blur-md bg-black text-white"
               >
                 <ShoppingBag className="mr-2 h-4 w-4" />
                 Add to Bag
               </Button>
               <Button 
                 variant="outline" 
-                className="flvunt-button-outline w-full"
+                className="flvunt-button-outline w-full bg-white/70 border-white/40 backdrop-blur-md"
                 onClick={handleWishlist}
               >
                 <Heart className="mr-2 h-4 w-4" />

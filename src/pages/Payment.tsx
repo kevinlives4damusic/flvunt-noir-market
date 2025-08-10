@@ -1,4 +1,3 @@
-
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,9 @@ import { createOrder } from '@/lib/orderService';
 import { PaymentProcessor } from '@/components/checkout/PaymentProcessor';
 import { PaymentVerification } from '@/components/checkout/PaymentVerification';
 import { initiateYocoCheckout } from '@/lib/yoco';
+import { getSavedPaymentMethods } from '@/lib/payment-service';
+import { CreditCardInput } from '@/components/checkout/CreditCardInput';
+import { useBeforeUnload } from '../hooks/use-before-unload';
 
 // Payment method option component
 const PaymentMethod = ({ 
@@ -55,6 +57,15 @@ const Payment = () => {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [nameOnCard, setNameOnCard] = useState('');
+  const [formIsValid, setFormIsValid] = useState(false);
+  const [savedMethods, setSavedMethods] = useState<{ method_id: string; brand: string; last4: string }[]>([]);
+  const [useSavedMethod, setUseSavedMethod] = useState<string | null>(null);
+
+  // Add leave page warning
+  useBeforeUnload(
+    processing,
+    'Are you sure you want to leave? Your payment is still being processed.'
+  );
 
   // Check if we're returning from a payment provider
   const isVerifying = searchParams.has('payment_id') || searchParams.has('status');
@@ -71,6 +82,20 @@ const Payment = () => {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
+
+  // Load saved payment methods for the user
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const methods = await getSavedPaymentMethods();
+        setSavedMethods(methods as any);
+        if (methods.length > 0) setUseSavedMethod(methods[0].method_id);
+      } catch (e) {
+        // ignore
+      }
+    };
+    void load();
+  }, []);
 
   // Create a new order in the database
   const createNewOrder = async () => {
@@ -193,15 +218,22 @@ const Payment = () => {
     setNameOnCard(e.target.value);
   };
   
-  // Handle payment initiation
+  const handleCardDetailsChange = (values: {
+    cardNumber: string;
+    expiryDate: string;
+    cvv: string;
+    nameOnCard: string;
+    isValid: boolean;
+  }) => {
+    setCardNumber(values.cardNumber);
+    setExpiryDate(values.expiryDate);
+    setCvv(values.cvv);
+    setNameOnCard(values.nameOnCard);
+    setFormIsValid(values.isValid);
+  };
+
   const handlePayment = async () => {
-    if (processing) return;
-    
-    // Basic validation
-    if (!cardNumber || !expiryDate || !cvv || !nameOnCard) {
-      toast.error('Please fill in all card details');
-      return;
-    }
+    if (processing || !formIsValid) return;
     
     // Set processing state
     setProcessing(true);
@@ -227,28 +259,22 @@ const Payment = () => {
       const cancelUrl = `${baseUrl}/payment-cancel?orderId=${newOrderId}`;
       const failureUrl = `${baseUrl}/payment-failure?orderId=${newOrderId}`;
       
-      // Process the payment directly with Yoco
       try {
-        // Create metadata with card and order details
+        // Create metadata without sensitive card details
         const metadata = {
           orderId: newOrderId,
-          cardDetails: {
-            last4: cardNumber.replace(/\s/g, '').slice(-4),
-            expiryMonth: expiryDate.split('/')[0],
-            expiryYear: `20${expiryDate.split('/')[1]}`,
-            nameOnCard
-          }
+          lastFour: cardNumber.replace(/\s/g, '').slice(-4)
         };
         
-        // Initiate Yoco checkout directly
+        // Initiate Yoco checkout
         const result = await initiateYocoCheckout(
-          Math.round(total * 100),  // amount in cents
-          'ZAR',                    // currency
-          successUrl,               // success URL
-          cancelUrl,                // cancel URL
-          failureUrl,               // failure URL
-          metadata,                 // metadata
-          saveCard                  // save card option
+          Math.round(total * 100),
+          'ZAR',
+          successUrl,
+          cancelUrl,
+          failureUrl,
+          metadata,
+          saveCard
         );
         
         if (!result.success || !result.data?.redirectUrl) {
@@ -335,65 +361,44 @@ const Payment = () => {
               
               {paymentMethod === 'yoco' && (
                 <div className="space-y-4 animate-fade-in">
-                  {/* Credit Card Input Fields */}
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-                      <input
-                        type="text"
-                        id="cardNumber"
-                        placeholder="1234 5678 9012 3456"
-                        className="w-full p-2 border border-gray-300 rounded"
-                        maxLength={19}
-                        value={cardNumber}
-                        onChange={handleCardNumberChange}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="expiryDate" className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                        <input
-                          type="text"
-                          id="expiryDate"
-                          placeholder="MM/YY"
-                          className="w-full p-2 border border-gray-300 rounded"
-                          maxLength={5}
-                          value={expiryDate}
-                          onChange={handleExpiryDateChange}
-                        />
+                  {savedMethods.length > 0 && (
+                    <div className="border rounded-md p-3 bg-gray-50">
+                      <p className="text-sm font-medium mb-2">Use a saved card</p>
+                      <div className="space-y-2">
+                        {savedMethods.map((m) => (
+                          <label key={m.method_id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="radio"
+                              name="savedMethod"
+                              checked={useSavedMethod === m.method_id}
+                              onChange={() => setUseSavedMethod(m.method_id)}
+                            />
+                            <span className="capitalize">{m.brand}</span>
+                            <span>•••• {m.last4}</span>
+                          </label>
+                        ))}
                       </div>
-                      <div>
-                        <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV</label>
-                        <input
-                          type="text"
-                          id="cvv"
-                          placeholder="123"
-                          className="w-full p-2 border border-gray-300 rounded"
-                          maxLength={4}
-                          value={cvv}
-                          onChange={handleCvvChange}
-                        />
-                      </div>
+                      <button
+                        className="mt-3 text-xs underline"
+                        onClick={() => setUseSavedMethod(null)}
+                        type="button"
+                      >
+                        Use a different card
+                      </button>
                     </div>
-                    
-                    <div>
-                      <label htmlFor="nameOnCard" className="block text-sm font-medium text-gray-700 mb-1">Name on Card</label>
-                      <input
-                        type="text"
-                        id="nameOnCard"
-                        placeholder="John Doe"
-                        className="w-full p-2 border border-gray-300 rounded"
-                        value={nameOnCard}
-                        onChange={handleNameOnCardChange}
-                      />
-                    </div>
-                  </div>
+                  )}
+                  {!useSavedMethod && (
+                    <CreditCardInput onChange={handleCardDetailsChange} />
+                  )}
                   
                   <button 
-                    className="w-full bg-black text-white py-3 rounded font-medium hover:bg-gray-800 transition-colors"
+                    className={`w-full py-3 rounded font-medium transition-colors ${
+                      (useSavedMethod ? true : formIsValid) 
+                        ? 'bg-black text-white hover:bg-gray-800' 
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
                     onClick={handlePayment}
-                    disabled={processing}
+                    disabled={processing || (!useSavedMethod && !formIsValid)}
                   >
                     {processing ? (
                       <span className="flex items-center justify-center">
@@ -416,18 +421,14 @@ const Payment = () => {
                   <span>Payment secured by 256-bit encryption</span>
                 </div>
                 
-                {/* Payment method logos */}
+                {/* Payment supporter indicator */}
                 <div className="mt-4 text-center border-t pt-4 w-full">
-                  <p className="text-sm text-gray-500 mb-2">We accept</p>
+                  <p className="text-sm text-gray-500 mb-2">Secure payments by</p>
                   <div className="flex justify-center items-center">
                     <img 
-                      src="/images/Screenshot-2025-05-04-195325.svg" 
-                      alt="Accepted payment methods" 
-                      className="h-16 mx-auto" 
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.outerHTML = '<div className="flex gap-2 justify-center"><span className="text-sm font-medium">Visa</span><span className="text-sm font-medium">Mastercard</span><span className="text-sm font-medium">American Express</span></div>';
-                      }}
+                      src="/images/Yoco.svg" 
+                      alt="Yoco" 
+                      className="h-8 mx-auto" 
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2">

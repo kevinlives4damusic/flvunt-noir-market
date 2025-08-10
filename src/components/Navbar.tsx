@@ -1,8 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { User, Heart, ShoppingBag, Menu, X, Home, Search, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { CartContext } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,7 @@ import {
 
 const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isAuthenticated, userEmail, logout } = useContext(CartContext);
+  const { user, signOut } = useAuth();
   
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -35,7 +35,7 @@ const Navbar: React.FC = () => {
 
             {/* Desktop Links */}
             <div className="hidden md:flex flex-1 items-center">
-              {isAuthenticated ? (
+              {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
@@ -43,9 +43,9 @@ const Navbar: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>{userEmail}</DropdownMenuLabel>
+                    <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="text-red-600">
+                    <DropdownMenuItem onClick={() => void signOut()} className="text-red-600">
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>
                     </DropdownMenuItem>
@@ -68,7 +68,7 @@ const Navbar: React.FC = () => {
 
             {/* Icons */}
             <div className="flex items-center gap-4 flex-1 justify-end">
-              {isAuthenticated ? (
+              {user ? (
                 <>
                   <Button variant="ghost" size="icon" asChild>
                     <Link to="/likes">
@@ -109,8 +109,8 @@ const Navbar: React.FC = () => {
               <Link to="/truckers" className="text-sm font-medium py-2 border-b">TRUCKERS</Link>
               <Link to="/contact" className="text-sm font-medium py-2 border-b">CONTACT</Link>
               
-              {isAuthenticated ? (
-                <Button onClick={logout} variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2">
+              {user ? (
+                <Button onClick={() => void signOut()} variant="outline" size="sm" className="flex items-center justify-center gap-2 w-full mt-2">
                   <LogOut className="h-4 w-4" />
                   <span>Log out</span>
                 </Button>
@@ -142,8 +142,8 @@ const Navbar: React.FC = () => {
             <ShoppingBag className="h-5 w-5" />
             <span className="text-xs mt-1">Cart</span>
           </Link>
-          {isAuthenticated ? (
-            <button onClick={logout} className="flex flex-col items-center">
+          {user ? (
+            <button onClick={() => void signOut()} className="flex flex-col items-center">
               <LogOut className="h-5 w-5" />
               <span className="text-xs mt-1">Logout</span>
             </button>

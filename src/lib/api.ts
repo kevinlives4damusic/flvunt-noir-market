@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiBaseUrl = '/.netlify/functions';  // Always use Netlify Functions
+const apiBaseUrl = '/api';
 
 // Create an axios instance for API calls
 const apiClient = axios.create({

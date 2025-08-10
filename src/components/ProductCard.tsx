@@ -77,7 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <div className="group relative">
         {/* Image container */}
-        <div className="aspect-square overflow-hidden bg-flvunt-lightgrey mb-3 relative">
+        <div className="aspect-square overflow-hidden bg-flvunt-lightgrey mb-3 relative rounded-xl border border-white/20 shadow-md">
           {isLoading && (
             <Skeleton className="absolute inset-0 z-10" />
           )}
@@ -90,10 +90,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
           />
           
           {/* Overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity duration-300 flex items-end justify-center opacity-0 group-hover:opacity-100">
-            <div className="flex gap-2 mb-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+          <div className="absolute inset-0 transition-opacity duration-300 flex items-end justify-center opacity-0 group-hover:opacity-100">
+            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="relative flex gap-2 mb-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
               <Button 
-                className="flvunt-button"
+                className="flvunt-button backdrop-blur-md bg-white/70 hover:bg-white/90 text-black border border-white/40"
                 onClick={handleAddToCart}
               >
                 <ShoppingBag className="h-4 w-4 mr-2" />
@@ -102,7 +103,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="bg-white hover:bg-flvunt-black hover:text-white rounded-none h-10 w-10 border-white"
+                className="bg-white/70 hover:bg-black hover:text-white rounded-md h-10 w-10 border-white/40 backdrop-blur-md"
                 onClick={() => setQuickViewOpen(true)}
               >
                 <Eye className="h-4 w-4" />
@@ -117,30 +118,30 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Labels */}
           {isNew && (
-            <span className="absolute top-2 left-2 bg-black text-white px-2 py-1 text-xs">
+            <span className="absolute top-2 left-2 bg-white/70 backdrop-blur-md text-black px-2 py-1 text-xs rounded-md border border-white/40">
               NEW
             </span>
           )}
           
           {isSale && (
-            <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 text-xs">
+            <span className="absolute top-2 left-2 bg-red-500/80 backdrop-blur-md text-white px-2 py-1 text-xs rounded-md border border-white/30">
               SALE
             </span>
           )}
         </div>
 
         {/* Product info */}
-        <div>
-          <p className="text-xs text-gray-600 mb-1">{designer}</p>
+        <div className="rounded-xl border border-white/20 bg-white/60 backdrop-blur-md p-3 shadow-sm">
+          <p className="text-xs text-gray-700 mb-1">{designer}</p>
           <h3 className="font-medium mb-1 text-sm">{name}</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-baseline">
             {isSale ? (
               <>
-                <p className="text-red-500 text-sm font-medium">{salePrice}</p>
-                <p className="text-gray-400 text-sm line-through">{price}</p>
+                <p className="text-red-600 text-sm font-semibold">{salePrice}</p>
+                <p className="text-gray-500 text-xs line-through">{price}</p>
               </>
             ) : (
-              <p className="text-sm">{price}</p>
+              <p className="text-sm font-medium">{price}</p>
             )}
           </div>
         </div>

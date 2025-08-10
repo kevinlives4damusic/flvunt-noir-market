@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
+import { useAuth } from '@/context/AuthContext';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Product {
   id: string;
@@ -13,44 +16,42 @@ interface Product {
 
 const Likes = () => {
   const [likedProducts, setLikedProducts] = useState<Product[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Load liked products from localStorage
-    const likedIds = JSON.parse(localStorage.getItem('likedProducts') || '{}');
-    
-    // Get all products data
-    const allProducts = [
-      // Shirts
-      ...Array.from({ length: 13 }, (_, i) => ({
-        id: String(i + 1),
-        name: i < 3 ? 'Graphic T-Shirt "Spray Tag"' :
-              i === 3 ? 'FLVUNT Graphic T-Shirt "Eagle"' :
-              i === 4 ? 'Masque de ski 2.0' :
-              i === 5 || i === 8 ? 'FLVUNT Plain Print T' :
-              i === 6 || i === 7 ? 'Masque de ski' :
-              'FLVUNT Graphic T-Shirt',
-        price: i < 3 ? 800 :
-               i === 3 ? 500 :
-               i === 5 || i === 8 ? 350 :
-               i === 6 || i === 7 ? 400 :
-               450,
-        description: "Premium quality apparel by FLVUNT",
-        image_url: `/images/shirts/image${i + 1}.jpg`
-      })),
-      // Hoodies
-      ...Array.from({ length: 4 }, (_, i) => ({
-        id: `hoodie-${i + 1}`,
-        name: 'VETEMENTS PAR FLVUNT® HOODIE',
-        price: i < 3 ? 900 : 450,
-        description: "Premium quality apparel by FLVUNT",
-        image_url: `/images/hoodies/image${i + 1}.jpg`
-      }))
-    ];
+    const loadLikes = async () => {
+      try {
+        let likedIds: string[] = [];
+        if (user) {
+          const likesSnap = await getDocs(collection(db(), 'users', user.uid, 'likes'));
+          likedIds = likesSnap.docs.map(d => d.id);
+        } else {
+          const liked = JSON.parse(localStorage.getItem('likedProducts') || '{}');
+          likedIds = Object.keys(liked).filter((k) => liked[k]);
+        }
 
-    // Filter only liked products
-    const liked = allProducts.filter(product => likedIds[product.id]);
-    setLikedProducts(liked);
-  }, []);
+        if (likedIds.length === 0) {
+          setLikedProducts([]);
+          return;
+        }
+
+        // Fetch product details for liked IDs
+        const products: Product[] = [];
+        for (const id of likedIds) {
+          const pSnap = await getDoc(doc(db(), 'products', id));
+          if (pSnap.exists()) {
+            const data = pSnap.data() as any;
+            products.push({ id: pSnap.id, ...data });
+          }
+        }
+        setLikedProducts(products);
+      } catch (error) {
+        console.error('Failed to load likes', error);
+        setLikedProducts([]);
+      }
+    };
+    void loadLikes();
+  }, [user]);
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -7,6 +7,7 @@
   command = "npm run dev"
   port = 8080
   targetPort = 8080
+  autoLaunch = true
 
 [[redirects]]
   from = "/api/*"
