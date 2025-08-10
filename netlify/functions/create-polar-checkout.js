@@ -14,15 +14,38 @@ if (!POLAR_API_KEY) {
 if (!admin.apps.length) {
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: serviceAccount.project_id,
+        credential: admin.credential.cert(sa),
+        projectId: sa.project_id,
+      });
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
+      const sa = JSON.parse(decoded);
+      admin.initializeApp({
+        credential: admin.credential.cert(sa),
+        projectId: sa.project_id,
+      });
+    } else if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          project_id: process.env.FIREBASE_PROJECT_ID,
+          client_email: process.env.FIREBASE_CLIENT_EMAIL,
+          private_key: privateKey,
+        }),
+        projectId: process.env.FIREBASE_PROJECT_ID,
       });
     } else {
       admin.initializeApp();
     }
-  } catch {}
+  } catch (e) {
+    console.error('Firebase Admin init failed:', e);
+  }
 }
 const db = admin.firestore();
 
