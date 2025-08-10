@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
 import admin from 'firebase-admin';
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
 
 const mapPolarStatusToLocal = (status) => {
   switch (status) {
@@ -49,10 +51,27 @@ export const handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
 
   try {
-    const payload = JSON.parse(event.body || '{}');
-    // const signature = event.headers['polar-signature']; // TODO: verify when available
-    const type = payload.type || payload.event || null;
-    const data = payload.data || payload.checkout || payload;
+    const rawBody = event.isBase64Encoded
+      ? Buffer.from(event.body || '', 'base64')
+      : Buffer.from(event.body || '', 'utf8');
+
+    let verified;
+    if (WEBHOOK_SECRET) {
+      try {
+        verified = validateEvent(rawBody, event.headers, WEBHOOK_SECRET);
+      } catch (err) {
+        if (err instanceof WebhookVerificationError) {
+          return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invalid signature' }) };
+        }
+        console.error('Webhook verification error:', err);
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Verification failed' }) };
+      }
+    } else {
+      verified = JSON.parse(rawBody.toString('utf8'));
+    }
+
+    const type = verified.type || verified.event || null;
+    const data = verified.data || verified.checkout || verified;
 
     const checkoutId = data?.id || data?.checkout_id || null;
     const orderId = data?.metadata?.orderId || null;
