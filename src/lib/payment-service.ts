@@ -124,11 +124,15 @@ export const createPayment = async ({
       // Optionally we could delete the original, but we simply keep updating the returned id
       // and let webhook update status consistently.
     }
-    await updateDoc(doc(db(), 'payments', targetPaymentId), {
-      checkout_id: checkoutResult.data?.checkoutId ?? null,
-      checkout_url: checkoutResult.data?.redirectUrl ?? null,
-      updated_at: new Date().toISOString(),
-    });
+    try {
+      await updateDoc(doc(db(), 'payments', targetPaymentId), {
+        checkout_id: checkoutResult.data?.checkoutId ?? null,
+        checkout_url: checkoutResult.data?.redirectUrl ?? null,
+        updated_at: new Date().toISOString(),
+      });
+    } catch {
+      // Non-fatal if client cannot reach Firestore; server already wrote
+    }
 
     const updated = await getPaymentById(targetPaymentId);
     return { success: true, payment: updated!, redirectUrl: checkoutResult.data?.redirectUrl };
