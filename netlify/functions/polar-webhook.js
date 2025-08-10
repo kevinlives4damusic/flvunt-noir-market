@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
+// Lightweight signature verification (HMAC-SHA256) without SDK
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
+const WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET || '';
 
 const mapPolarStatusToLocal = (status) => {
   switch (status) {
@@ -55,23 +56,22 @@ export const handler = async (event) => {
       ? Buffer.from(event.body || '', 'base64')
       : Buffer.from(event.body || '', 'utf8');
 
-    let verified;
+    // Verify signature: Polar commonly uses a signature header; we support both 'polar-signature' and 'x-polar-signature'
+    const signatureHeader = event.headers['polar-signature'] || event.headers['x-polar-signature'];
     if (WEBHOOK_SECRET) {
-      try {
-        verified = validateEvent(rawBody, event.headers, WEBHOOK_SECRET);
-      } catch (err) {
-        if (err instanceof WebhookVerificationError) {
-          return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invalid signature' }) };
-        }
-        console.error('Webhook verification error:', err);
-        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Verification failed' }) };
+      if (!signatureHeader) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Missing signature' }) };
       }
-    } else {
-      verified = JSON.parse(rawBody.toString('utf8'));
+      const computed = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');
+      const provided = (Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader).trim();
+      if (computed !== provided) {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Invalid signature' }) };
+      }
     }
 
-    const type = verified.type || verified.event || null;
-    const data = verified.data || verified.checkout || verified;
+    const parsed = JSON.parse(rawBody.toString('utf8'));
+    const type = parsed.type || parsed.event || null;
+    const data = parsed.data || parsed.checkout || parsed;
 
     const checkoutId = data?.id || data?.checkout_id || null;
     const orderId = data?.metadata?.orderId || null;
