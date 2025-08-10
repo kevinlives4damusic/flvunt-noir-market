@@ -10,11 +10,12 @@ export default defineConfig(({ mode }) => {
   
   // Get the repository name from package.json or environment
   const repoName = process.env.REPOSITORY_NAME || 'flvunt-noir-market'
+  const isNetlify = process.env.NETLIFY === 'true' || process.env.NETLIFY === '1'
   
   return {
     plugins: [react()],
-    // Base path for GitHub Pages: /<repository-name>/
-    base: process.env.NODE_ENV === 'production' ? `/${repoName}/` : '/',
+    // Use root base on Netlify; use repo base on GitHub Pages
+    base: isNetlify ? '/' : (process.env.NODE_ENV === 'production' ? `/${repoName}/` : '/'),
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
