@@ -43,6 +43,9 @@ export const handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid amount' }) };
     }
 
+    // Build idempotency key from order + user/email when available
+    const idempotencyKey = metadata?.idempotencyKey || `${metadata?.orderId || 'no-order'}:${metadata?.userId || metadata?.userEmail || 'anon'}:${amountInCents}:${currency}`;
+
     // Create checkout in Polar
     const createRes = await axios.post(
       `${POLAR_API_BASE}/checkouts`,
@@ -53,7 +56,7 @@ export const handler = async (event) => {
         cancel_url: cancelUrl || failureUrl,
         metadata: { ...metadata, saveCard },
       },
-      { headers: { Authorization: `Bearer ${POLAR_API_KEY}`, 'Content-Type': 'application/json' } }
+      { headers: { Authorization: `Bearer ${POLAR_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey } }
     );
 
     const checkoutId = createRes.data?.id || createRes.data?.checkout?.id;
@@ -81,7 +84,7 @@ export const handler = async (event) => {
           checkout_id: checkoutId,
           checkout_url: redirectUrl,
           error_message: null,
-          metadata: { ...metadata, saveCard },
+          metadata: { ...metadata, saveCard, idempotencyKey },
           created_at: nowIso,
           updated_at: nowIso,
         });

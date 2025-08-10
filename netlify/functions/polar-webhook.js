@@ -50,6 +50,7 @@ export const handler = async (event) => {
 
   try {
     const payload = JSON.parse(event.body || '{}');
+    // const signature = event.headers['polar-signature']; // TODO: verify when available
     const type = payload.type || payload.event || null;
     const data = payload.data || payload.checkout || payload;
 

@@ -1,4 +1,4 @@
-import { initiateYocoCheckout } from './yoco';
+import { initiatePolarCheckout } from './polar';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
 import { v4 as uuidv4 } from 'uuid';
 import { PaymentStatus, isValidTransition, getTransitionDescription } from './payment-status';
@@ -73,42 +73,20 @@ export const createPayment = async ({
       idempotencyKey = uuidv4();
     }
 
-    const nowIso = new Date().toISOString();
-    const paymentDoc = await addDoc(collection(db(), 'payments'), {
-      order_id: orderId,
-      user_id: user.uid,
-      amount_cents: amountInCents,
-      currency,
-      status: 'pending',
-      payment_provider: 'polar',
-      provider_payment_id: null,
-      checkout_id: null,
-      checkout_url: null,
-      error_message: null,
-      metadata: { ...metadata, idempotencyKey },
-      created_at: nowIso,
-      updated_at: nowIso,
-    });
-
-    const checkoutResult = await initiateYocoCheckout(
+    // Let the Netlify function create the initial payment doc to avoid client Firestore connectivity flakiness
+    const checkoutResult = await initiatePolarCheckout(
       amountInCents,
       currency,
       successUrl,
       cancelUrl,
       failureUrl,
-      { ...metadata, paymentId: paymentDoc.id, orderId, idempotencyKey },
+      { ...metadata, orderId, idempotencyKey },
       saveCard
     );
 
     if (!checkoutResult.success) {
-      await updateDoc(doc(db(), 'payments', paymentDoc.id), {
-        status: 'failed',
-        error_message: checkoutResult.error?.message ?? 'Checkout failed',
-        updated_at: new Date().toISOString(),
-      });
       return {
         success: false,
-        payment: await getPaymentById(paymentDoc.id) ?? undefined,
         error: createPaymentError(
           PaymentErrorCode.CHECKOUT_FAILED,
           checkoutResult.error?.message || 'Failed to create checkout',
@@ -119,23 +97,21 @@ export const createPayment = async ({
 
     // If the function created the payment server-side, align ids
     const returnedPaymentId = checkoutResult.data?.paymentId;
-    const targetPaymentId = returnedPaymentId || paymentDoc.id;
-    if (returnedPaymentId && returnedPaymentId !== paymentDoc.id) {
-      // Optionally we could delete the original, but we simply keep updating the returned id
-      // and let webhook update status consistently.
-    }
+    const targetPaymentId = returnedPaymentId || '';
     try {
-      await updateDoc(doc(db(), 'payments', targetPaymentId), {
-        checkout_id: checkoutResult.data?.checkoutId ?? null,
-        checkout_url: checkoutResult.data?.redirectUrl ?? null,
-        updated_at: new Date().toISOString(),
-      });
+      if (targetPaymentId) {
+        await updateDoc(doc(db(), 'payments', targetPaymentId), {
+          checkout_id: checkoutResult.data?.checkoutId ?? null,
+          checkout_url: checkoutResult.data?.redirectUrl ?? null,
+          updated_at: new Date().toISOString(),
+        });
+      }
     } catch {
       // Non-fatal if client cannot reach Firestore; server already wrote
     }
 
-    const updated = await getPaymentById(targetPaymentId);
-    return { success: true, payment: updated!, redirectUrl: checkoutResult.data?.redirectUrl };
+    const updated = targetPaymentId ? await getPaymentById(targetPaymentId) : null;
+    return { success: true, payment: updated ?? undefined, redirectUrl: checkoutResult.data?.redirectUrl };
   } catch (error) {
     console.error('Payment creation error:', error);
     return {
@@ -205,7 +181,7 @@ export const updateOrderAfterSuccessfulPayment = async (
 
 export interface SavedPaymentMethod {
   method_id: string;
-  provider: 'yoco';
+  provider: 'polar' | string;
   brand: string;
   last4: string;
   created_at: string;
