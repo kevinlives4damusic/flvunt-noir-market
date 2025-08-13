@@ -3,7 +3,7 @@ import { getDb, verifyAuthIfRequired, json } from './_shared.js';
 const toCents = (value) => Math.round(Number(value || 0) * 100);
 
 export const handler = async (event) => {
-  const allowOrigin = process.env.CLIENT_BASE_URL || '*';
+  const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
   if (event.httpMethod === 'OPTIONS') return json(204, {}, allowOrigin);
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' }, allowOrigin);
 

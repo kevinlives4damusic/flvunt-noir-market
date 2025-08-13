@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { auth } from './firebase';
 
-const apiBaseUrl = '/api';
+const apiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 // Create an axios instance for API calls
 const apiClient = axios.create({

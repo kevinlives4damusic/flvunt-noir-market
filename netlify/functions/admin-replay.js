@@ -4,7 +4,7 @@ import { getDb, verifyAuthIfRequired, json, isAdmin, logPaymentEvent } from './_
 const POLAR_API_BASE = 'https://api.polar.sh/v1';
 
 export const handler = async (event) => {
-  const allowOrigin = process.env.CLIENT_BASE_URL || '*';
+  const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': allowOrigin, 'Access-Control-Allow-Headers': 'Content-Type, Authorization' } };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' }, allowOrigin);
 

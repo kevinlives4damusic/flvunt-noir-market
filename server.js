@@ -12,7 +12,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-const clientOrigin = process.env.CLIENT_BASE_URL || 'http://localhost:8080';
+const clientOrigin = process.env.CLIENT_BASE_URL || 'http://localhost:5173';
 
 // Remove legacy Yoco requirement
 

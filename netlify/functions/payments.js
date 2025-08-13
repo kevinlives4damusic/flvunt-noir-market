@@ -2,7 +2,7 @@ import admin from 'firebase-admin';
 import { getDb, verifyAuthIfRequired, json, isAdmin } from './_shared.js';
 
 export const handler = async (event) => {
-  const allowOrigin = process.env.CLIENT_BASE_URL || '*';
+  const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
   const db = getDb();
   if (event.httpMethod === 'OPTIONS') return json(204, {}, allowOrigin);
   if (event.httpMethod !== 'GET') return json(405, { error: 'Method not allowed' }, allowOrigin);

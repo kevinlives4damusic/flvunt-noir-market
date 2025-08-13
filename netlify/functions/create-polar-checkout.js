@@ -60,7 +60,7 @@ try {
 }
 
 export const handler = async (event) => {
-  const allowOrigin = process.env.CLIENT_BASE_URL || '*';
+  const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
   const headers = {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',

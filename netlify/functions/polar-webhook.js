@@ -85,7 +85,7 @@ const mapPolarStatusToLocal = (status) => {
 
 export const handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.CLIENT_BASE_URL || event.headers?.origin || '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };

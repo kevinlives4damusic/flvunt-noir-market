@@ -3,15 +3,15 @@ import { getAnalytics, isSupported, type Analytics, logEvent as firebaseLogEvent
 import { getAuth, type Auth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, type Firestore } from 'firebase/firestore';
 
-// Firebase configuration provided by the user
+// Firebase configuration sourced from env with safe fallbacks
 const firebaseConfig = {
-  apiKey: 'AIzaSyBJJXf9lvqTLMTA8JY-KV2PJ0ed-1zS1LU',
-  authDomain: 'flvunt-f8765.firebaseapp.com',
-  projectId: 'flvunt-f8765',
-  storageBucket: 'flvunt-f8765.firebasestorage.app',
-  messagingSenderId: '801071424735',
-  appId: '1:801071424735:web:f920b48114a1f7322df56a',
-  measurementId: 'G-YJCRWLMTEE',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBJJXf9lvqTLMTA8JY-KV2PJ0ed-1zS1LU',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'flvunt-f8765.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'flvunt-f8765',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'flvunt-f8765.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '801071424735',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:801071424735:web:f920b48114a1f7322df56a',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-YJCRWLMTEE',
 };
 
 let appInstance: FirebaseApp | null = null;
