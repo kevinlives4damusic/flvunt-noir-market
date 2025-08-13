@@ -1,0 +1,3 @@
+YOCO_SECRET_KEY not set. Yoco endpoints will be disabled until configured.
+Server running on port 5000
+Accepting requests from: http://localhost:8080
