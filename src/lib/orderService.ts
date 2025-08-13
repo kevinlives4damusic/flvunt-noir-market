@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import apiClient, { createOrderServer } from './api';
 
 export interface OrderItem {
   product_id: string;
@@ -29,47 +30,13 @@ export const createOrder = async (params: CreateOrderParams) => {
       throw new Error('User must be authenticated to create an order');
     }
 
-    const {
-      items,
-      amount_cents,
-      currency = 'ZAR',
-      metadata
-    } = params;
-
-    // Create order document
-    const orderRef = await addDoc(collection(db(), 'orders'), {
-      user_id: user.uid,
-      order_number: generateOrderNumber(),
-      amount_cents,
-      currency,
-      metadata: metadata ?? null,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    // Create order items as a subcollection
-    const itemsCol = collection(db(), 'orders', orderRef.id, 'order_items');
-    await Promise.all(
-      items.map((item) => addDoc(itemsCol, {
-        ...item,
-        created_at: new Date().toISOString(),
-      }))
-    );
-
-    return { 
-      success: true, 
-      data: { 
-        id: orderRef.id,
-        user_id: user.uid,
-        order_number: generateOrderNumber(),
-        amount_cents,
-        currency,
-        metadata: metadata ?? null,
-        status: 'pending',
-        items,
-      } 
-    };
+    const { items, currency = 'ZAR', metadata } = params as any;
+    const payloadItems = items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }));
+    const resp = await createOrderServer(payloadItems, currency, metadata);
+    if (!resp.success) {
+      return { success: false, error: resp.error };
+    }
+    return { success: true, data: resp.data };
 
   } catch (error) {
     console.error('Error in createOrder:', error);

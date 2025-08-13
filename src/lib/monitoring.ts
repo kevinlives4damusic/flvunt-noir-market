@@ -1,5 +1,3 @@
-import { PostgrestError } from '@supabase/supabase-js';
-
 interface ErrorLog {
   timestamp: string;
   error: string;
@@ -9,7 +7,7 @@ interface ErrorLog {
 const MAX_ERROR_LOGS = 100;
 const errorLogs: ErrorLog[] = [];
 
-export const logDatabaseError = (error: PostgrestError | Error, context?: Record<string, any>) => {
+export const logDatabaseError = (error: unknown, context?: Record<string, any>) => {
   const errorLog: ErrorLog = {
     timestamp: new Date().toISOString(),
     error: error instanceof Error ? error.message : JSON.stringify(error),

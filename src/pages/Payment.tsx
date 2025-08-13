@@ -12,6 +12,7 @@ import { createOrder } from '@/lib/orderService';
 import { PaymentProcessor } from '@/components/checkout/PaymentProcessor';
 import { PaymentVerification } from '@/components/checkout/PaymentVerification';
 import { initiatePolarCheckout } from '@/lib/polar';
+import { v4 as uuidv4 } from 'uuid';
 import { getSavedPaymentMethods } from '@/lib/payment-service';
 import { CreditCardInput } from '@/components/checkout/CreditCardInput';
 import { useBeforeUnload } from '../hooks/use-before-unload';
@@ -52,6 +53,7 @@ const Payment = () => {
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [orderAmountCents, setOrderAmountCents] = useState<number | null>(null);
   const [saveCard, setSaveCard] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -128,6 +130,7 @@ const Payment = () => {
       
       if (result.success && result.data) {
         setOrderId(result.data.id);
+        if ((result.data as any).amount_cents != null) setOrderAmountCents((result.data as any).amount_cents);
         return result.data.id;
       } else {
         throw new Error(result.error || 'Failed to create order');
@@ -260,6 +263,15 @@ const Payment = () => {
       const failureUrl = `${baseUrl}/payment-failure?orderId=${newOrderId}`;
       
       try {
+        // Persist idempotency key per order
+        const idKeyStorage = `payment:idempotency:${newOrderId}`;
+        let idemKey = undefined as string | undefined;
+        try {
+          const stored = window.localStorage.getItem(idKeyStorage);
+          idemKey = stored || uuidv4();
+          if (!stored) window.localStorage.setItem(idKeyStorage, idemKey);
+        } catch {}
+
         // Create metadata without sensitive card details
         const metadata = {
           orderId: newOrderId,
@@ -267,13 +279,14 @@ const Payment = () => {
         };
         
         // Initiate Polar checkout
+        const amountToChargeCents = orderAmountCents ?? Math.round(total * 100);
         const result = await initiatePolarCheckout(
-          Math.round(total * 100),
+          amountToChargeCents,
           'ZAR',
           successUrl,
           cancelUrl,
           failureUrl,
-          metadata,
+          { ...metadata, idempotencyKey: idemKey },
           saveCard
         );
         

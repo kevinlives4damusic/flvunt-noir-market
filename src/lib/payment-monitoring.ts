@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+import { addDoc, collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { getCountFromServer } from 'firebase/firestore';
+import { db } from './firebase';
 import { PaymentError } from './payment-errors';
 import { PaymentStatus } from './payment-status';
 
@@ -19,18 +21,12 @@ export interface PaymentEvent {
  */
 export const logPaymentEvent = async (event: Omit<PaymentEvent, 'id' | 'timestamp'>) => {
   try {
-    const { error } = await supabase
-      .from('payment_events')
-      .insert({
-        ...event,
-        timestamp: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Error logging payment event:', error);
-    }
+    await addDoc(collection(db(), 'payment_events'), {
+      ...event,
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
-    console.error('Error in logPaymentEvent:', error);
+    console.error('Error logging payment event:', error);
   }
 };
 
@@ -38,18 +34,18 @@ export const logPaymentEvent = async (event: Omit<PaymentEvent, 'id' | 'timestam
  * Get payment events for a specific payment
  */
 export const getPaymentEvents = async (paymentId: string): Promise<PaymentEvent[]> => {
-  const { data, error } = await supabase
-    .from('payment_events')
-    .select('*')
-    .eq('paymentId', paymentId)
-    .order('timestamp', { ascending: false });
-
-  if (error) {
+  try {
+    const q = query(
+      collection(db(), 'payment_events'),
+      where('paymentId', '==', paymentId),
+      orderBy('timestamp', 'desc'),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as PaymentEvent[];
+  } catch (error) {
     console.error('Error fetching payment events:', error);
     return [];
   }
-
-  return data || [];
 };
 
 /**
@@ -59,26 +55,27 @@ export const getPaymentErrorRate = async (
   startDate: Date,
   endDate: Date = new Date()
 ): Promise<number> => {
-  const { data: errors, error: errorCountError } = await supabase
-    .from('payment_events')
-    .select('count', { count: 'exact', head: true })
-    .eq('type', 'error')
-    .gte('timestamp', startDate.toISOString())
-    .lte('timestamp', endDate.toISOString());
-
-  const { data: total, error: totalCountError } = await supabase
-    .from('payments')
-    .select('count', { count: 'exact', head: true })
-    .gte('created_at', startDate.toISOString())
-    .lte('created_at', endDate.toISOString());
-
-  if (errorCountError || totalCountError) {
-    console.error('Error calculating error rate:', errorCountError || totalCountError);
+  try {
+    const errorsQuery = query(
+      collection(db(), 'payment_events'),
+      where('type', '==', 'error'),
+      where('timestamp', '>=', startDate.toISOString()),
+      where('timestamp', '<=', endDate.toISOString()),
+    );
+    const totalQuery = query(
+      collection(db(), 'payments'),
+      where('created_at', '>=', startDate.toISOString()),
+      where('created_at', '<=', endDate.toISOString()),
+    );
+    const [errorsCountSnap, totalCountSnap] = await Promise.all([
+      getCountFromServer(errorsQuery),
+      getCountFromServer(totalQuery),
+    ]);
+    const errorCount = errorsCountSnap.data().count || 0;
+    const totalCount = totalCountSnap.data().count || 1; // avoid divide by zero
+    return (errorCount / totalCount) * 100;
+  } catch (error) {
+    console.error('Error calculating error rate:', error);
     return 0;
   }
-
-  const errorCount = errors?.[0]?.count || 0;
-  const totalCount = total?.[0]?.count || 1; // Avoid division by zero
-
-  return (errorCount / totalCount) * 100;
 };

@@ -5,13 +5,13 @@ import { initializeFirestore, type Firestore } from 'firebase/firestore';
 
 // Firebase configuration provided by the user
 const firebaseConfig = {
-  apiKey: 'AIzaSyCKUymW9WFOQiXfq0BQnv7d1muHpoxV8Dc',
-  authDomain: 'lvnt-159f3.firebaseapp.com',
-  projectId: 'lvnt-159f3',
-  storageBucket: 'lvnt-159f3.firebasestorage.app',
-  messagingSenderId: '515324294893',
-  appId: '1:515324294893:web:5e6e13ac18d6803c1f3ee4',
-  measurementId: 'G-SNPLP52EVV',
+  apiKey: 'AIzaSyBJJXf9lvqTLMTA8JY-KV2PJ0ed-1zS1LU',
+  authDomain: 'flvunt-f8765.firebaseapp.com',
+  projectId: 'flvunt-f8765',
+  storageBucket: 'flvunt-f8765.firebasestorage.app',
+  messagingSenderId: '801071424735',
+  appId: '1:801071424735:web:f920b48114a1f7322df56a',
+  measurementId: 'G-YJCRWLMTEE',
 };
 
 let appInstance: FirebaseApp | null = null;
@@ -27,11 +27,11 @@ export async function initFirebase(): Promise<{ app: FirebaseApp; analytics: Ana
     authInstance = getAuth(appInstance);
   }
   if (!dbInstance) {
-    // Auto-detect long polling to avoid WebChannel 400s behind restrictive proxies/CDNs
+    // Force long polling to avoid WebChannel 400s behind restrictive proxies/CDNs
     dbInstance = initializeFirestore(appInstance, {
-      experimentalAutoDetectLongPolling: true,
+      experimentalForceLongPolling: true,
       useFetchStreams: false,
-    });
+    } as any);
   }
   if (!analyticsInstance && typeof window !== 'undefined' && (await isSupported())) {
     analyticsInstance = getAnalytics(appInstance);

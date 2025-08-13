@@ -19,6 +19,10 @@ import PaymentCancel from "./pages/PaymentCancel";
 import PaymentFailure from "./pages/PaymentFailure";
 import Contact from "./pages/Contact";
 import Likes from "./pages/Likes";
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminProducts from './pages/admin/Products';
+import PaymentDetail from './pages/admin/PaymentDetail';
+import OrderDetail from './pages/admin/OrderDetail';
 import AuthCallback from "./components/auth/AuthCallback";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from '@/context/AuthContext';
@@ -30,8 +34,7 @@ import './App.css'
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [isYocoLoading, setIsYocoLoading] = useState(false);
-  const [yocoError, setYocoError] = useState<string | null>(null);
+  // Removed Yoco-specific state
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -86,6 +89,10 @@ const App = () => {
                   <Route path="/shirts" element={<Shirts />} />
                   <Route path="/truckers" element={<Truckers />} />
                   <Route path="/likes" element={<Likes />} />
+                  <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                  <Route path="/admin/products" element={<ProtectedRoute><AdminProducts /></ProtectedRoute>} />
+                  <Route path="/admin/payments/:id" element={<ProtectedRoute><PaymentDetail /></ProtectedRoute>} />
+                  <Route path="/admin/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </CartProvider>

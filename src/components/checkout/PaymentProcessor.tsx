@@ -71,7 +71,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         setError(errorMessage);
         if (onError) onError(errorMessage);
       } else {
-        // Redirect to Yoco checkout
+        // Redirect to Polar checkout
         window.location.href = result.redirectUrl;
       }
     } catch (err) {
@@ -89,7 +89,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       <CardHeader>
         <CardTitle>Complete Your Payment</CardTitle>
         <CardDescription>
-          Secure payment powered by Yoco
+          Secure payment powered by Polar
         </CardDescription>
       </CardHeader>
       
@@ -122,11 +122,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             </p>
             
             <div className="flex items-center justify-center mt-4">
-              <img 
-                src="/images/yoco-logo.svg" 
-                alt="Yoco Secure Payments" 
-                className="h-8"
-              />
+              <span className="text-sm">Polar</span>
             </div>
           </div>
         </div>

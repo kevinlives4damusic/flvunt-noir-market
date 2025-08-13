@@ -10,9 +10,10 @@ This project is built with:
 
 - **Frontend**: React + TypeScript + Vite
 - **UI**: shadcn-ui (Radix UI components) + Tailwind CSS
-- **Backend**: Express.js (converted to serverless functions for GitHub Pages)
-- **Database**: Supabase
-- **Deployment**: GitHub Pages + Netlify Functions
+- **Backend**: Netlify Functions (ESM) with optional Express dev server
+- **Database**: Firebase (Firestore + Auth)
+- **Payments**: Polar
+- **Deployment**: Netlify (Functions + Static site)
 
 ## Local Development
 
@@ -29,36 +30,25 @@ cd flvunt-noir-market
 npm install
 
 # Step 4: Create a .env.local file with required environment variables
-# (See .env.example for required variables)
+# (Configure these in Netlify project settings for deploys)
+#
+# POLAR_API_KEY=your_polar_api_key
+# POLAR_WEBHOOK_SECRET=your_shared_webhook_secret
+# FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'  # optional for local Netlify dev
 
 # Step 5: Start the development server
 npm run dev
 ```
 
-## GitHub Pages Deployment
+## Running with Netlify Dev
 
-This project has been configured to deploy to GitHub Pages. To deploy:
+To run the frontend and functions locally behind a single dev server:
 
-1. **Push your code to GitHub**:
-   ```sh
-   git add .
-   git commit -m "Your commit message"
-   git push origin main
-   ```
+```sh
+npm run dev:netlify
+```
 
-2. **Set up GitHub Pages**:
-   - Go to your repository on GitHub
-   - Navigate to Settings > Pages
-   - Set the source to GitHub Actions
-
-3. **Set up repository secrets**:
-   - Go to Settings > Secrets and Variables > Actions
-   - Add the following secrets:
-     - `VITE_YOCO_PUBLIC_KEY`: Your Yoco public key
-
-4. **Run the GitHub Action**:
-   - The workflow will automatically run on push to the main branch
-   - You can also manually trigger it from the Actions tab
+This proxies `/api/*` to Netlify functions.
 
 ## Project Structure
 
@@ -73,12 +63,23 @@ This project has been configured to deploy to GitHub Pages. To deploy:
 
 ## Environment Variables
 
-Create a `.env.local` file with the following variables for local development:
+Set these in local `.env` for Netlify dev and in Netlify project settings for deploys:
 
-```
-VITE_YOCO_PUBLIC_KEY=your_yoco_public_key
-```
+- `POLAR_API_KEY` – Polar API key (required)
+- `POLAR_WEBHOOK_SECRET` – shared secret for webhook validation (recommended)
+- `FIREBASE_SERVICE_ACCOUNT` – JSON for Firebase Admin (optional locally; recommended in Netlify for server-side writes)
 
 ## API Integration
 
-The application uses Netlify Functions to handle server-side operations like payment processing. These functions are automatically deployed alongside the static site when using the GitHub Actions workflow.
+The application uses Netlify Functions for server-side operations, including creating Polar checkouts and handling webhooks. Functions are in `netlify/functions/` and are exported as ESM.
+
+### Serverless API
+
+Endpoints (proxied under `/api/*` by `netlify.toml`):
+
+- POST `/api/orders` — Create an order server-side. Body: `{ items: [{ product_id, quantity }], currency?, metadata? }`. Totals are computed from the product catalog to prevent tampering.
+- POST `/api/create-polar-checkout` — Create Polar checkout. Accepts `metadata.idempotencyKey`; reuses pending payment if key matches.
+- GET `/api/payments/:id` — Get payment status/details. Requires auth if `REQUIRE_AUTH=true`.
+- POST `/api/refund-payment` — Admin-only refund. Body: `{ paymentId, amountInCents? }`.
+
+Admin access: set `ADMIN_UIDS` to a comma-separated list of Firebase UIDs or add custom claim `admin: true` for operators.

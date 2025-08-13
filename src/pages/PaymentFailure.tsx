@@ -4,7 +4,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { getOrder, updateOrderStatus } from '@/lib/orderService';
-import { initiateYocoCheckout } from '@/lib/yoco';
+import { initiatePolarCheckout } from '@/lib/polar';
 import { toastError } from '@/components/ui/toast-with-progress';
 
 const PaymentFailure = () => {
@@ -37,7 +37,7 @@ const PaymentFailure = () => {
       const order = result.data;
       const baseUrl = window.location.origin;
       
-      const checkoutResult = await initiateYocoCheckout(
+      const checkoutResult = await initiatePolarCheckout(
         order.amount_cents,
         order.currency,
         `${baseUrl}/payment-success?orderId=${orderId}`,
@@ -57,7 +57,7 @@ const PaymentFailure = () => {
       // Update order status to pending before redirect
       await updateOrderStatus(orderId, 'pending');
       
-      // Redirect to Yoco checkout
+      // Redirect to Polar checkout
       window.location.href = checkoutResult.data?.redirectUrl || '';
       
     } catch (error) {
