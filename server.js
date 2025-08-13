@@ -16,10 +16,10 @@ const app = express();
 const port = process.env.PORT || 5000;
 const clientOrigin = process.env.CLIENT_BASE_URL || 'http://localhost:8080';
 
-// Validate required environment variables
+// In development, allow server to start without Yoco secret key.
+// Yoco endpoints will respond with 500 until configured.
 if (!process.env.YOCO_SECRET_KEY) {
-  console.error('Error: YOCO_SECRET_KEY is required but not set in environment variables');
-  process.exit(1);
+  console.warn('YOCO_SECRET_KEY not set. Yoco endpoints will be disabled until configured.');
 }
 
 app.use(cors({ origin: clientOrigin }));
