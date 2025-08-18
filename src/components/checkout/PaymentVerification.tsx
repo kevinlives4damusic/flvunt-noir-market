@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-// Polar checkout verification can be handled by our DB status only
 import { verifyPayment } from '@/lib/payment-service';
 
 interface PaymentVerificationProps {
@@ -15,26 +14,25 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
 }) => {
   const [searchParams] = useSearchParams();
   const [isVerifying, setIsVerifying] = useState(true);
-  const checkoutId = searchParams.get('checkout_id');
-  const paymentId = searchParams.get('payment_id');
+  const paymentId = searchParams.get('paymentId');
+  const reference = searchParams.get('reference');
 
   useEffect(() => {
     const verifyPaymentStatus = async () => {
-      if (!checkoutId || !paymentId) {
+      if (!paymentId && !reference) {
         setIsVerifying(false);
         if (onError) onError('Missing payment information');
         return;
       }
 
       try {
-        // Verify using our backend record only (Polar webhook updates it)
-        const result = await verifyPayment(paymentId);
-        if (!result.success) {
+        const idToVerify = paymentId || reference!;
+        const result = await verifyPayment(idToVerify);
+        if (!result.success || !result.payment) {
           throw new Error(result.error?.message || 'Payment verification failed');
         }
-
         setIsVerifying(false);
-        if (onSuccess) onSuccess(paymentId);
+        if (onSuccess) onSuccess(result.payment.id);
       } catch (error) {
         console.error('Payment verification error:', error);
         setIsVerifying(false);
@@ -43,7 +41,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
     };
 
     verifyPaymentStatus();
-  }, [checkoutId, paymentId, onSuccess, onError]);
+  }, [paymentId, reference, onSuccess, onError]);
 
   if (!isVerifying) {
     return null;

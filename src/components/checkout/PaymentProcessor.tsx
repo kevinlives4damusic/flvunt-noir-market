@@ -71,7 +71,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         setError(errorMessage);
         if (onError) onError(errorMessage);
       } else {
-        // Redirect to Polar checkout
+        // Redirect to provider checkout
         window.location.href = result.redirectUrl;
       }
     } catch (err) {
@@ -89,7 +89,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       <CardHeader>
         <CardTitle>Complete Your Payment</CardTitle>
         <CardDescription>
-          Secure payment powered by Polar
+          Secure payment powered by our provider
         </CardDescription>
       </CardHeader>
       
@@ -122,7 +122,7 @@ export const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             </p>
             
             <div className="flex items-center justify-center mt-4">
-              <span className="text-sm">Polar</span>
+              <span className="text-sm">Secure Provider</span>
             </div>
           </div>
         </div>

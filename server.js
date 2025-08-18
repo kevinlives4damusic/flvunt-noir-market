@@ -26,12 +26,13 @@ app.get('/health', (req, res) => {
 
 // Remove legacy Yoco checkout endpoint
 app.post('/api/create-yoco-checkout', (_req, res) => {
-  return res.status(410).json({ error: 'Legacy Yoco checkout disabled. Use Netlify Polar functions.' });
+  return res.status(410).json({ error: 'Legacy Yoco checkout disabled.' });
 });
 
 // Remove legacy Yoco webhook
 app.post('/api/webhook', (_req, res) => {
-  return res.status(410).json({ error: 'Legacy Yoco webhook disabled. Use Netlify Polar webhook.' });
+  return res.status(410).json({ error: 'Legacy Yoco webhook disabled.' });
+
 });
 
 app.listen(port, () => {

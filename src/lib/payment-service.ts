@@ -1,4 +1,3 @@
-import { initiatePolarCheckout } from './polar';
 import { PaymentError, PaymentErrorCode, createPaymentError } from './payment-errors';
 import { v4 as uuidv4 } from 'uuid';
 import { PaymentStatus, isValidTransition, getTransitionDescription } from './payment-status';
@@ -87,69 +86,31 @@ export const createPayment = async ({
       } catch {}
     }
 
-    const nowIso = new Date().toISOString();
-    const paymentDoc = await addDoc(collection(db(), 'payments'), {
-      order_id: orderId,
-      user_id: user.uid,
-      amount_cents: amountInCents,
-      currency,
-      status: 'pending',
-      payment_provider: 'polar',
-      provider_payment_id: null,
-      checkout_id: null,
-      checkout_url: null,
-      error_message: null,
-      metadata: { ...metadata, idempotencyKey },
-      created_at: nowIso,
-      updated_at: nowIso,
-    });
-
-    const checkoutResult = await initiatePolarCheckout(
+    // Initialize via Netlify function
+    const { createPaystackCheckout } = await import('./api');
+    const result = await createPaystackCheckout(
+      orderId,
       amountInCents,
       currency,
       successUrl,
       cancelUrl,
       failureUrl,
-      { ...metadata, paymentId: paymentDoc.id, orderId, idempotencyKey },
+      { ...metadata },
+      idempotencyKey,
       saveCard
     );
 
-    if (!checkoutResult.success) {
-      await updateDoc(doc(db(), 'payments', paymentDoc.id), {
-        status: 'failed',
-        error_message: checkoutResult.error?.message ?? 'Checkout failed',
-        updated_at: new Date().toISOString(),
-      });
+    if (!result.success) {
       return {
         success: false,
-        payment: await getPaymentById(paymentDoc.id) ?? undefined,
         error: createPaymentError(
           PaymentErrorCode.CHECKOUT_FAILED,
-          checkoutResult.error?.message || 'Failed to create checkout',
-          (checkoutResult.error as any)?.detail
+          typeof result.error === 'string' ? result.error : (result as any).error
         )
       };
     }
 
-    // If the function created the payment server-side, align ids
-    const returnedPaymentId = checkoutResult.data?.paymentId;
-    const targetPaymentId = returnedPaymentId || paymentDoc.id;
-    if (returnedPaymentId && returnedPaymentId !== paymentDoc.id) {
-      // Optionally we could delete the original, but we simply keep updating the returned id
-      // and let webhook update status consistently.
-    }
-    try {
-      await updateDoc(doc(db(), 'payments', targetPaymentId), {
-        checkout_id: checkoutResult.data?.checkoutId ?? null,
-        checkout_url: checkoutResult.data?.redirectUrl ?? null,
-        updated_at: new Date().toISOString(),
-      });
-    } catch {
-      // Non-fatal if client cannot reach Firestore; server already wrote
-    }
-
-    const updated = await getPaymentById(targetPaymentId);
-    return { success: true, payment: updated!, redirectUrl: checkoutResult.data?.redirectUrl };
+    return { success: true, redirectUrl: result.data.redirectUrl };
   } catch (error) {
     console.error('Payment creation error:', error);
     return {
@@ -224,7 +185,7 @@ export const verifyPayment = async (paymentId: string): Promise<{ success: boole
 };
 
 export const updateOrderAfterSuccessfulPayment = async (
-  orderId: string, 
+  orderId: string,
   paymentId: string
 ): Promise<boolean> => {
   try {
@@ -242,7 +203,7 @@ export const updateOrderAfterSuccessfulPayment = async (
 
 export interface SavedPaymentMethod {
   method_id: string;
-  provider: 'polar' | string;
+  provider: string;
   brand: string;
   last4: string;
   created_at: string;

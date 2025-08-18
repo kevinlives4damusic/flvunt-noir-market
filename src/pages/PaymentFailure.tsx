@@ -4,7 +4,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { getOrder, updateOrderStatus } from '@/lib/orderService';
-import { initiatePolarCheckout } from '@/lib/polar';
+// Payment provider integration removed
 import { toastError } from '@/components/ui/toast-with-progress';
 
 const PaymentFailure = () => {
@@ -37,28 +37,8 @@ const PaymentFailure = () => {
       const order = result.data;
       const baseUrl = window.location.origin;
       
-      const checkoutResult = await initiatePolarCheckout(
-        order.amount_cents,
-        order.currency,
-        `${baseUrl}/payment-success?orderId=${orderId}`,
-        `${baseUrl}/payment-cancel?orderId=${orderId}`,
-        `${baseUrl}/payment-failure?orderId=${orderId}`,
-        {
-          orderId,
-          isRetry: true,
-          previousFailure: true
-        }
-      );
-
-      if (!checkoutResult.success) {
-        throw new Error(checkoutResult.error?.message || 'Failed to initiate payment');
-      }
-
-      // Update order status to pending before redirect
-      await updateOrderStatus(orderId, 'pending');
-      
-      // Redirect to Polar checkout
-      window.location.href = checkoutResult.data?.redirectUrl || '';
+      // No provider configured
+      toastError('Unavailable', 'Payment provider not configured');
       
     } catch (error) {
       setRetrying(false);

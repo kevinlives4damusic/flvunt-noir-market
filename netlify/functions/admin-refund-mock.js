@@ -24,7 +24,7 @@ export const handler = async (event) => {
     await ref.set({ status: newStatus, updated_at: new Date().toISOString() }, { merge: true });
     await logPaymentEvent(db, {
       type: 'refund',
-      provider: 'polar',
+      provider: 'custom',
       paymentId,
       status: newStatus,
     });

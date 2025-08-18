@@ -1,36 +1,11 @@
 import axios from 'axios';
 import { getDb, verifyAuthIfRequired, json, isAdmin, logPaymentEvent } from './_shared.js';
 
-const POLAR_API_BASE = 'https://api.polar.sh/v1';
-const POLAR_API_KEY = process.env.POLAR_API_KEY || null;
-const POLAR_CLIENT_ID = process.env.POLAR_CLIENT_ID || null;
-const POLAR_CLIENT_SECRET = process.env.POLAR_CLIENT_SECRET || null;
-
-let cachedToken = null;
-let cachedTokenExpiresAt = 0;
-async function getPolarAccessToken() {
-  if (POLAR_API_KEY) return POLAR_API_KEY;
-  if (!POLAR_CLIENT_ID || !POLAR_CLIENT_SECRET) return null;
-  const now = Date.now();
-  if (cachedToken && now < cachedTokenExpiresAt - 60_000) return cachedToken;
-  const tokenUrl = 'https://api.polar.sh/oauth2/token';
-  const body = new URLSearchParams({ grant_type: 'client_credentials' });
-  const basic = Buffer.from(`${POLAR_CLIENT_ID}:${POLAR_CLIENT_SECRET}`).toString('base64');
-  const res = await axios.post(tokenUrl, body.toString(), {
-    headers: { 'Authorization': `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
-  const accessToken = res.data?.access_token;
-  const expiresIn = Number(res.data?.expires_in || 3600) * 1000;
-  if (!accessToken) return null;
-  cachedToken = accessToken;
-  cachedTokenExpiresAt = Date.now() + expiresIn;
-  return accessToken;
-}
-
 export const handler = async (event) => {
   const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
   if (event.httpMethod === 'OPTIONS') return json(204, {}, allowOrigin);
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' }, allowOrigin);
+
 
   const authResult = await verifyAuthIfRequired(event);
   if (!authResult.ok) return json(401, { error: authResult.error }, allowOrigin);
@@ -38,6 +13,9 @@ export const handler = async (event) => {
 
   const db = getDb();
   if (!db) return json(503, { error: 'Database not available' }, allowOrigin);
+
+  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+  if (!PAYSTACK_SECRET_KEY) return json(500, { error: 'Paystack not configured' }, allowOrigin);
 
   try {
     const { paymentId, amountInCents } = JSON.parse(event.body || '{}');
@@ -64,22 +42,13 @@ export const handler = async (event) => {
       refundAmount = amountInCents;
     }
 
-    // Attempt provider refund if configured (best-effort)
-    try {
-      const accessToken = await getPolarAccessToken();
-      if (accessToken && payment.provider_payment_id) {
-        await axios.post(
-          `${POLAR_API_BASE}/refunds`,
-          {
-            payment_id: payment.provider_payment_id,
-            amount: refundAmount,
-            reason: 'requested_by_customer',
-          },
-          { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
-        );
-      }
-    } catch (err) {
-      console.warn('Provider refund call failed; proceeding to mark refund locally', err.response?.data || err.message);
+    // Call Paystack refund API if reference is present
+    if (payment.provider_payment_id) {
+      await axios.post(
+        'https://api.paystack.co/refund',
+        { transaction: payment.provider_payment_id, amount: refundAmount },
+        { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, 'Content-Type': 'application/json' } }
+      );
     }
 
     const newRefunded = alreadyRefunded + refundAmount;
@@ -98,10 +67,9 @@ export const handler = async (event) => {
       updated_at: new Date().toISOString(),
     }, { merge: true });
 
-    // If fully refunded, mark order refunded
     if (payment.order_id) {
       await db.collection('orders').doc(payment.order_id).set({
-        status: 'refunded',
+        status: newStatus === 'refunded' ? 'refunded' : 'paid',
         updated_at: new Date().toISOString(),
       }, { merge: true });
     }
@@ -114,8 +82,9 @@ export const handler = async (event) => {
     });
 
     return json(200, { success: true, status: newStatus, refundedAmountInCents: newRefunded }, allowOrigin);
+
   } catch (err) {
-    console.error('Refund error:', err);
+    console.error('Refund error:', err?.response?.data || err.message);
     return json(500, { error: 'Server error' }, allowOrigin);
   }
 };

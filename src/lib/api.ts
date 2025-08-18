@@ -32,40 +32,20 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
-// API function for Polar checkout
-export const createPolarCheckout = async (
-  amountInCents: number,
-  currency: string = 'ZAR',
-  successUrl?: string,
-  cancelUrl?: string,
-  failureUrl?: string,
-  metadata?: Record<string, any>,
-  saveCard: boolean = false
+// Placeholder API for checkout (no provider configured)
+export const createCheckout = async (
+  _amountInCents: number,
+  _currency: string = 'ZAR',
+  _successUrl?: string,
+  _cancelUrl?: string,
+  _failureUrl?: string,
+  _metadata?: Record<string, any>,
+  _saveCard: boolean = false
 ) => {
-  try {
-    const response = await apiClient.post('/create-polar-checkout', {
-      amountInCents,
-      currency,
-      successUrl,
-      cancelUrl,
-      failureUrl,
-      metadata,
-      saveCard
-    });
-
-    return {
-      success: true,
-      data: response.data as { redirectUrl: string; checkoutId: string; paymentId?: string }
-    };
-  } catch (error) {
-    console.error('Error creating Polar checkout:', error);
-    return {
-      success: false,
-      error: axios.isAxiosError(error) 
-        ? error.response?.data?.error || error.message
-        : 'Unknown error'
-    };
-  }
+  return {
+    success: false,
+    error: 'Payment provider not configured'
+  } as const;
 };
 
 export const getPaymentStatus = async (paymentId: string) => {
@@ -123,4 +103,40 @@ export const adminRefundMock = async (paymentId: string, partial?: boolean) => {
 export const adminReplay = async (checkoutId: string) => {
   const res = await apiClient.post('/admin-replay', { checkout_id: checkoutId });
   return res.data as { success: boolean; status: string };
+};
+
+// Paystack
+export const createPaystackCheckout = async (
+  orderId: string,
+  amountInCents: number,
+  currency: string,
+  successUrl?: string,
+  cancelUrl?: string,
+  failureUrl?: string,
+  metadata?: Record<string, any>,
+  idempotencyKey?: string,
+  saveCard?: boolean,
+) => {
+  try {
+    const res = await apiClient.post('/paystack-init', {
+      orderId,
+      amountInCents,
+      currency,
+      successUrl,
+      cancelUrl,
+      failureUrl,
+      metadata,
+      idempotencyKey,
+      saveCard: !!saveCard,
+    });
+    return { success: true, data: res.data as { redirectUrl: string; paymentId: string; checkoutId?: string } } as const;
+  } catch (error) {
+    console.error('Error creating Paystack checkout:', error);
+    return {
+      success: false,
+      error: axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : 'Unknown error'
+    } as const;
+  }
 };

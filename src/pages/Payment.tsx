@@ -11,9 +11,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { createOrder } from '@/lib/orderService';
 import { PaymentProcessor } from '@/components/checkout/PaymentProcessor';
 import { PaymentVerification } from '@/components/checkout/PaymentVerification';
-import { initiatePolarCheckout } from '@/lib/polar';
+// Payment provider integration removed
 import { v4 as uuidv4 } from 'uuid';
-import { getSavedPaymentMethods } from '@/lib/payment-service';
+import { getSavedPaymentMethods, createPayment } from '@/lib/payment-service';
 import { CreditCardInput } from '@/components/checkout/CreditCardInput';
 import { useBeforeUnload } from '../hooks/use-before-unload';
 
@@ -49,7 +49,7 @@ const Payment = () => {
   const { isAuthenticated, items, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [paymentMethod, setPaymentMethod] = useState('polar');
+  const [paymentMethod, setPaymentMethod] = useState('card');
   const [processing, setProcessing] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -70,7 +70,7 @@ const Payment = () => {
   );
 
   // Check if we're returning from a payment provider
-  const isVerifying = searchParams.has('payment_id') || searchParams.has('status');
+  const isVerifying = searchParams.has('paymentId') || searchParams.has('reference') || searchParams.has('status');
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 4.99;
@@ -103,10 +103,8 @@ const Payment = () => {
   const createNewOrder = async () => {
     try {
       setProcessing(true);
-      
       // Generate a unique order number
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-      
       // Create the order in the database
       const orderData = {
         orderNumber,
@@ -114,20 +112,15 @@ const Payment = () => {
           product_id: item.id.toString(),
           quantity: item.quantity,
           price_cents: Math.round(item.price * 100),
-          metadata: {
-            name: item.name,
-            image: item.image
-          }
+          metadata: { name: item.name, image: item.image }
         })),
         amount_cents: Math.round(total * 100),
         currency: 'ZAR',
         metadata: {
-          customer_email: 'customer@example.com' // This would come from user profile
+          customer_email: 'thamsanxamudau@gmail.com'
         }
       };
-      
       const result = await createOrder(orderData);
-      
       if (result.success && result.data) {
         setOrderId(result.data.id);
         if ((result.data as any).amount_cents != null) setOrderAmountCents((result.data as any).amount_cents);
@@ -142,7 +135,7 @@ const Payment = () => {
       return null;
     }
   };
-  
+
   // Handle successful payment
   const handlePaymentSuccess = (paymentId: string) => {
     setPaymentSuccess(true);
@@ -150,7 +143,7 @@ const Payment = () => {
     clearCart();
     navigate(`/payment-success?orderId=${orderId}&paymentId=${paymentId}`);
   };
-  
+
   // Handle payment error
   const handlePaymentError = (error: string) => {
     toast.error(`Payment failed: ${error}`);
@@ -159,7 +152,7 @@ const Payment = () => {
       navigate(`/payment-failure?orderId=${orderId}`);
     }
   };
-  
+
   // Handle payment cancellation
   const handlePaymentCancel = () => {
     setProcessing(false);
@@ -168,59 +161,7 @@ const Payment = () => {
       navigate(`/payment-cancel?orderId=${orderId}`);
     }
   };
-  
-  // Format card number with spaces after every 4 digits
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return value;
-    }
-  };
-  
-  // Format expiry date as MM/YY
-  const formatExpiryDate = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    
-    if (v.length >= 3) {
-      return `${v.substring(0, 2)}/${v.substring(2)}`;
-    } else {
-      return v;
-    }
-  };
-  
-  // Handle card number input change
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedValue = formatCardNumber(e.target.value);
-    setCardNumber(formattedValue);
-  };
-  
-  // Handle expiry date input change
-  const handleExpiryDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formattedValue = formatExpiryDate(e.target.value);
-    setExpiryDate(formattedValue);
-  };
-  
-  // Handle CVV input change
-  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
-    setCvv(value);
-  };
-  
-  // Handle name on card input change
-  const handleNameOnCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNameOnCard(e.target.value);
-  };
-  
+
   const handleCardDetailsChange = (values: {
     cardNumber: string;
     expiryDate: string;
@@ -236,77 +177,53 @@ const Payment = () => {
   };
 
   const handlePayment = async () => {
-    if (processing || !formIsValid) return;
-    
-    // Set processing state
+    if (processing) return;
     setProcessing(true);
-    
     try {
-      // Create a new order first
       const newOrderId = await createNewOrder();
       if (!newOrderId) {
         setProcessing(false);
         return;
       }
-      
-      // Only Polar is supported now
-      if (paymentMethod !== 'polar') {
-        toast.error('Only Polar payments are supported at this time');
+      if (paymentMethod !== 'card') {
+        toast.error('Unsupported payment method');
         setProcessing(false);
         return;
       }
-      
-      // Set up URLs for payment flow
       const baseUrl = window.location.origin;
       const successUrl = `${baseUrl}/payment-success?orderId=${newOrderId}`;
       const cancelUrl = `${baseUrl}/payment-cancel?orderId=${newOrderId}`;
       const failureUrl = `${baseUrl}/payment-failure?orderId=${newOrderId}`;
-      
-      try {
-        // Persist idempotency key per order
-        const idKeyStorage = `payment:idempotency:${newOrderId}`;
-        let idemKey = undefined as string | undefined;
-        try {
-          const stored = window.localStorage.getItem(idKeyStorage);
-          idemKey = stored || uuidv4();
-          if (!stored) window.localStorage.setItem(idKeyStorage, idemKey);
-        } catch {}
 
-        // Create metadata without sensitive card details
-        const metadata = {
-          orderId: newOrderId,
-          lastFour: cardNumber.replace(/\s/g, '').slice(-4)
-        };
-        
-        // Initiate Polar checkout
-        const amountToChargeCents = orderAmountCents ?? Math.round(total * 100);
-        const result = await initiatePolarCheckout(
-          amountToChargeCents,
-          'ZAR',
-          successUrl,
-          cancelUrl,
-          failureUrl,
-          { ...metadata, idempotencyKey: idemKey },
-          saveCard
-        );
-        
-        if (!result.success || !result.data?.redirectUrl) {
-          throw new Error(result.error ? 
-            (typeof result.error === 'string' ? result.error : result.error.message) : 
-            'Payment creation failed');
-        }
-        
-        // Redirect to the Polar checkout page
-        window.location.href = result.data.redirectUrl;
-      } catch (error) {
-        console.error('Payment processing error:', error);
-        handlePaymentError(error instanceof Error ? error.message : 'Payment processing failed');
+      const idKeyStorage = `payment:idempotency:${newOrderId}`;
+      let idemKey: string | undefined;
+      try {
+        const stored = window.localStorage.getItem(idKeyStorage);
+        idemKey = stored || uuidv4();
+        if (!stored) window.localStorage.setItem(idKeyStorage, idemKey);
+      } catch {}
+
+      const amountToChargeCents = orderAmountCents ?? Math.round(total * 100);
+      const result = await createPayment({
+        orderId: newOrderId,
+        amountInCents: amountToChargeCents,
+        currency: 'ZAR',
+        successUrl,
+        cancelUrl,
+        failureUrl,
+        saveCard,
+        metadata: { orderId: newOrderId },
+        idempotencyKey: idemKey,
+      });
+
+      if (!result.success || !result.redirectUrl) {
+        throw new Error(result.error ? (typeof result.error === 'string' ? result.error : (result.error as any).message) : 'Payment creation failed');
       }
-      
+
+      window.location.href = result.redirectUrl;
     } catch (error) {
-      console.error('Payment error:', error);
-      toast.error('An error occurred during payment processing');
-      setProcessing(false);
+      console.error('Payment processing error:', error);
+      handlePaymentError(error instanceof Error ? error.message : 'Payment processing failed');
     }
   };
 
@@ -347,18 +264,15 @@ const Payment = () => {
           <div className="flex-1">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <h2 className="text-xl font-medium mb-6">Payment Options</h2>
-              
               <div className="space-y-3 mb-6">
-                <PaymentMethod 
-                  id="polar" 
-                  name="Credit/Debit Card" 
-                  icon={<CreditCard className="h-5 w-5" />} 
-                  selected={paymentMethod === 'polar'} 
-                  onSelect={() => setPaymentMethod('polar')} 
+                <PaymentMethod
+                  id="card" 
+                  name="Credit/Debit Card"
+                  icon={<CreditCard className="h-5 w-5" />}
+                  selected={paymentMethod === 'card'}
+                  onSelect={() => setPaymentMethod('card')}
                 />
               </div>
-              
-              {/* Save card information checkbox */}
               <div className="mt-6 flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -371,8 +285,7 @@ const Payment = () => {
                   Save my card for future purchases
                 </label>
               </div>
-              
-              {paymentMethod === 'polar' && (
+              {paymentMethod === 'card' && (
                 <div className="space-y-4 animate-fade-in">
                   {savedMethods.length > 0 && (
                     <div className="border rounded-md p-3 bg-gray-50">
@@ -403,7 +316,6 @@ const Payment = () => {
                   {!useSavedMethod && (
                     <CreditCardInput onChange={handleCardDetailsChange} />
                   )}
-                  
                   <button 
                     className={`w-full py-3 rounded font-medium transition-colors ${
                       (useSavedMethod ? true : formIsValid) 
@@ -427,18 +339,15 @@ const Payment = () => {
                   </button>
                 </div>
               )}
-              
               <div className="flex flex-col items-center mt-6">
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
                   <Shield className="h-4 w-4" />
                   <span>Payment secured by 256-bit encryption</span>
                 </div>
-                
-                {/* Payment supporter indicator */}
                 <div className="mt-4 text-center border-t pt-4 w-full">
                   <p className="text-sm text-gray-500 mb-2">Secure payments by</p>
                   <div className="flex justify-center items-center">
-                    <span className="text-sm">Polar</span>
+                    <span className="text-sm">Paystack</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Your card details are securely processed and protected by 256-bit encryption
@@ -446,7 +355,6 @@ const Payment = () => {
                 </div>
               </div>
             </div>
-            
             <div className="mt-6">
               <Collapsible>
                 <CollapsibleTrigger className="text-sm text-gray-600 hover:underline flex items-center">
@@ -466,7 +374,6 @@ const Payment = () => {
               </Collapsible>
             </div>
           </div>
-          
           <div className="w-full lg:w-96">
             <div className="bg-gray-50 p-6 sticky top-24">
               <h2 className="text-xl font-medium mb-6">Order Summary</h2>
