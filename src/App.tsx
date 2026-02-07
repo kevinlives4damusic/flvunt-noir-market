@@ -15,6 +15,7 @@ import Hoodies from "./pages/Hoodies";
 import Shirts from "./pages/Shirts";
 import Truckers from "./pages/Truckers";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import ProductPage from "./pages/ProductPage";
 import PaymentCancel from "./pages/PaymentCancel";
 import PaymentFailure from "./pages/PaymentFailure";
 import Contact from "./pages/Contact";
@@ -88,6 +89,7 @@ const App = () => {
                   <Route path="/hoodies" element={<Hoodies />} />
                   <Route path="/shirts" element={<Shirts />} />
                   <Route path="/truckers" element={<Truckers />} />
+                  <Route path="/product/:id" element={<ProductPage />} />
                   <Route path="/likes" element={<Likes />} />
                   <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
                   <Route path="/admin/products" element={<ProtectedRoute><AdminProducts /></ProtectedRoute>} />

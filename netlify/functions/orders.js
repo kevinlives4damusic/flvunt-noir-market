@@ -25,14 +25,19 @@ export const handler = async (event) => {
 
     const productsSnap = await Promise.all(productIds.map((id) => db.collection('products').doc(id).get()));
     const productMap = new Map();
-    for (const s of productsSnap) {
-      if (!s.exists) return json(400, { error: `Product not found: ${s.id}` }, allowOrigin);
+    for (let i = 0; i < productsSnap.length; i++) {
+      const s = productsSnap[i];
+      const productId = productIds[i];
+      if (!s.exists) return json(400, { error: `Product not found: ${productId}` }, allowOrigin);
       productMap.set(s.id, { id: s.id, ...s.data() });
     }
 
     const orderItems = items.map((i) => {
       const pid = i.product_id || i.productId;
       const product = productMap.get(pid);
+      if (!product) {
+        throw new Error(`Product not found in map: ${pid}`);
+      }
       const unitCents = product.price_cents != null ? Number(product.price_cents) : toCents(product.price);
       const qty = Math.max(1, Number(i.quantity || 1));
       return {
@@ -59,10 +64,14 @@ export const handler = async (event) => {
     const itemsCol = db.collection('orders').doc(orderDoc.id).collection('order_items');
     await Promise.all(orderItems.map((it) => itemsCol.add({ ...it, created_at: nowIso })));
 
+    // Fetch the created order to get the actual order_number
+    const createdOrder = await orderDoc.get();
+    const orderData = createdOrder.data();
+
     return json(200, {
       id: orderDoc.id,
       user_id: authResult.decoded?.uid || null,
-      order_number: `FLV-${Date.now().toString().slice(-6)}000`,
+      order_number: orderData.order_number,
       amount_cents,
       currency,
       metadata,

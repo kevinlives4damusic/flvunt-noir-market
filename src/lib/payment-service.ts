@@ -137,14 +137,22 @@ export const getPaymentsByOrderId = async (orderId: string): Promise<Payment[]> 
   return snap.docs.map((d) => mapPaymentFromDb({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
-export const verifyPayment = async (paymentId: string): Promise<{ success: boolean; payment?: Payment; error?: PaymentError }> => {
+export const getPaymentByProviderReference = async (reference: string): Promise<Payment | null> => {
+  const q = query(collection(db(), 'payments'), where('provider_payment_id', '==', reference));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return mapPaymentFromDb({ id: snap.docs[0].id, ...(snap.docs[0].data() as Record<string, unknown>) });
+};
+
+export const verifyPayment = async (paymentIdOrReference: string): Promise<{ success: boolean; payment?: Payment; error?: PaymentError }> => {
   try {
-    // Try server status endpoint first for freshest status
+    // Try server status endpoint first for freshest status (only works with paymentId)
+    let payment: Payment | null = null;
     try {
-      const res = await (await import('./api')).getPaymentStatus(paymentId);
+      const res = await (await import('./api')).getPaymentStatus(paymentIdOrReference);
       if (res.success && res.data) {
         const p = res.data as any;
-        return { success: p.status === 'succeeded', payment: {
+        payment = {
           id: p.id,
           orderId: p.orderId,
           amountInCents: p.amountInCents,
@@ -158,14 +166,25 @@ export const verifyPayment = async (paymentId: string): Promise<{ success: boole
           metadata: p.metadata,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
-        } as Payment };
+        } as Payment;
+        return { success: payment.status === 'succeeded', payment };
       }
-    } catch {}
-
-    const payment = await getPaymentById(paymentId);
-    if (!payment) {
-      return { success: false, error: createPaymentError(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED, 'Payment not found', `No payment found with ID ${paymentId}`) };
+    } catch {
+      // If server endpoint fails, try local lookup
     }
+
+    // Try to find by payment ID first
+    payment = await getPaymentById(paymentIdOrReference);
+    
+    // If not found by ID, try to find by provider reference
+    if (!payment) {
+      payment = await getPaymentByProviderReference(paymentIdOrReference);
+    }
+
+    if (!payment) {
+      return { success: false, error: createPaymentError(PaymentErrorCode.PAYMENT_VERIFICATION_FAILED, 'Payment not found', `No payment found with ID or reference ${paymentIdOrReference}`) };
+    }
+    
     if (['succeeded', 'failed', 'canceled', 'refunded', 'partially_refunded'].includes(payment.status)) {
       return { success: payment.status === 'succeeded', payment };
     }

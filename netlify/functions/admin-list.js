@@ -2,7 +2,7 @@ import { getDb, verifyAuthIfRequired, json, isAdmin } from './_shared.js';
 
 export const handler = async (event) => {
   const allowOrigin = process.env.CLIENT_BASE_URL || event.headers?.origin || '*';
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { 'Access-Control-Allow-Origin': allowOrigin, 'Access-Control-Allow-Headers': 'Content-Type, Authorization' } };
+  if (event.httpMethod === 'OPTIONS') return json(204, {}, allowOrigin);
   if (event.httpMethod !== 'GET') return json(405, { error: 'Method not allowed' }, allowOrigin);
 
   const authResult = await verifyAuthIfRequired(event);

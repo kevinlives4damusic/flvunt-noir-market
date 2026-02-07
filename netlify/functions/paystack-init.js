@@ -91,16 +91,17 @@ export const handler = async (event) => {
     const access_code = data.access_code || null;
     const paystack_reference = data.reference || reference;
 
-    await paymentRef.set(
-      {
-        status: 'processing',
-        provider_payment_id: paystack_reference,
-        checkout_id: access_code,
-        checkout_url: authorization_url,
-        updated_at: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    if (!authorization_url) {
+      throw new Error('Paystack did not return authorization URL');
+    }
+
+    await paymentRef.update({
+      status: 'processing',
+      provider_payment_id: paystack_reference,
+      checkout_id: access_code,
+      checkout_url: authorization_url,
+      updated_at: new Date().toISOString(),
+    });
 
     await logPaymentEvent(db, {
       type: 'init',

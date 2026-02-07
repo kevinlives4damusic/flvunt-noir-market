@@ -52,8 +52,18 @@ export const handler = async (event) => {
 
     let newStatus = 'processing';
     let errorMessage = null;
-    if (eventType === 'charge.success' || data.status === 'success') newStatus = 'succeeded';
-    else if (eventType === 'charge.failed' || data.status === 'failed') { newStatus = 'failed'; errorMessage = data.gateway_response || 'Payment failed'; }
+    
+    // Handle various Paystack event types
+    if (eventType === 'charge.success' || eventType === 'charge.successful' || data.status === 'success') {
+      newStatus = 'succeeded';
+    } else if (eventType === 'charge.failed' || eventType === 'charge.failure' || data.status === 'failed') {
+      newStatus = 'failed';
+      errorMessage = data.gateway_response || data.message || 'Payment failed';
+    } else if (eventType === 'charge.pending' || data.status === 'pending') {
+      newStatus = 'pending';
+    } else if (eventType === 'charge.refunded' || data.status === 'refunded') {
+      newStatus = 'refunded';
+    }
 
     await paymentRef.set({
       status: newStatus,
@@ -64,7 +74,11 @@ export const handler = async (event) => {
     }, { merge: true });
 
     if (newStatus === 'succeeded' && orderId) {
-      await db.collection('orders').doc(String(orderId)).set({ status: 'paid', updated_at: new Date().toISOString() }, { merge: true });
+      const orderRef = db.collection('orders').doc(String(orderId));
+      const orderSnap = await orderRef.get();
+      if (orderSnap.exists) {
+        await orderRef.set({ status: 'paid', updated_at: new Date().toISOString() }, { merge: true });
+      }
     }
 
     await logPaymentEvent(db, { type: 'webhook', provider: 'paystack', paymentId: paymentId || null, reference, status: newStatus });

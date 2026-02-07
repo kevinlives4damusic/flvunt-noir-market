@@ -1,4 +1,3 @@
-import admin from 'firebase-admin';
 import { getDb, verifyAuthIfRequired, json, isAdmin } from './_shared.js';
 
 export const handler = async (event) => {

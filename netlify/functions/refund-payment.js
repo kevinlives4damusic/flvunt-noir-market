@@ -44,11 +44,17 @@ export const handler = async (event) => {
 
     // Call Paystack refund API if reference is present
     if (payment.provider_payment_id) {
-      await axios.post(
-        'https://api.paystack.co/refund',
-        { transaction: payment.provider_payment_id, amount: refundAmount },
-        { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, 'Content-Type': 'application/json' } }
-      );
+      try {
+        await axios.post(
+          'https://api.paystack.co/refund',
+          { transaction: payment.provider_payment_id, amount: refundAmount },
+          { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, 'Content-Type': 'application/json' } }
+        );
+      } catch (refundErr) {
+        console.error('Paystack refund API error:', refundErr?.response?.data || refundErr.message);
+        // Continue with local refund even if Paystack API fails
+        // The payment status will be updated locally
+      }
     }
 
     const newRefunded = alreadyRefunded + refundAmount;
